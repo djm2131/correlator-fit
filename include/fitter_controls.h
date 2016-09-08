@@ -21,7 +21,13 @@ typedef struct {
   int traj_start;
   int traj_end;
   int traj_inc;
+  int Ntraj;
   int bin_size;
+  
+  // Fit parameters
+  int Ndata;
+  int Nparams;
+  std::vector<std::vector<double>> p0; // initial guesses
   
   // Parameters for individual correlator fits
   std::vector<fit_params> fits;
