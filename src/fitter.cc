@@ -16,14 +16,12 @@ typedef struct {
 
 Fitter::Fitter(std::string xml_path)
 {
-  fc = {};
+  printf("\n----- Constructing fitter and loading raw data -----\n");
   
   {
     XML_parser XML(xml_path);
     fc = XML.parse_all();
   }
-  
-  printf("\n----- Constructing fitter and loading raw data -----\n");
   
   corrs.resize(fc.fits.size());
   for(unsigned int i=0; i<fc.fits.size(); ++i){
@@ -60,9 +58,9 @@ int Fitter::f(const gsl_vector* x, void* data, gsl_vector* y)
 // Neat trick: we can construct a C function pointer to a member
 // function of a C++ class by declaring a static wrapper which
 // gets passed a 'this' pointer through the fit_data struct
-int Fitter::f_wrapper(const gsl_vector* x, void* data, gsl_vector* f)
+int Fitter::f_wrapper(const gsl_vector* x, void* data, gsl_vector* y)
 {
-  return static_cast<fit_data*>((fit_data*)data)->me->f(x,data,f);
+  return static_cast<fit_data*>((fit_data*)data)->me->f(x,data,y);
 }
 
 int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J)
@@ -95,125 +93,155 @@ int Fitter::df_wrapper(const gsl_vector* x, void* data, gsl_matrix* J)
   return static_cast<fit_data*>((fit_data*)data)->me->df(x,data,J);
 }
 
-void Fitter::do_fit(void)
+fit_results Fitter::do_fit(void)
 {
-  // First we fit to the average of all jackknife samples
-  double* weights = new double[fc.Ndata];
-  fit_data fd;
-  fd.t = new double[fc.Ndata];
-  fd.C = new double[fc.Ndata];
-  fd.me = this;
+  std::vector<double> chi2pdof_jacks(fc.Ntraj);
+  fit_results fr = { 0.0, 0.0, std::vector<double>(fc.Nparams), std::vector<double>(fc.Nparams), 
+                     std::vector<std::vector<double>>(fc.Ntraj,std::vector<double>(fc.Nparams)) };
+  
+  // Loop over jackknife samples
+  // -1 is the fit to all data (central value)
+  for(int jknife_idx=-1; jknife_idx<fc.Ntraj; ++jknife_idx)
   {
-    int ii = 0;
-    std::vector<double> Cavg(fc.Ndata), Cstd(fc.Ndata);
-    printf("fc.Ntraj = %d\n", fc.Ntraj);
-    printf("fc.Ndata = %d\n", fc.Ndata);
-    std::vector<std::vector<double>> Cfit(fc.Ntraj, std::vector<double>(fc.Ndata,0.0));
+    if(jknife_idx == -1){ printf("\n----- Fitting to all data -----\n"); }
+    else{ printf("\n----- Jackknife sample %d of %d -----\n", jknife_idx+1, fc.Ntraj); }
     
-    // Loop through the raw data and store the points to fit
-    for(unsigned int i=0; i<fc.fits.size(); ++i)
+    double* weights = new double[fc.Ndata];
+    fit_data fd;
+    fd.t = new double[fc.Ndata];
+    fd.C = new double[fc.Ndata];
+    fd.me = this;
     {
-      // t
-      int t_min = fc.fits[i].t_min;
-      int t_max = fc.fits[i].t_max;
-      int t_len = t_max - t_min + 1;
-      for(int j=0; j<t_len; ++j){ 
-        fd.t[ii] = t_min+j; 
-        ii += 1; 
-      }
+      int ii = 0;
+      std::vector<double> Cavg(fc.Ndata), Cstd(fc.Ndata);
+      std::vector<std::vector<double>> Cfit(fc.Ntraj, std::vector<double>(fc.Ndata,0.0));
       
-      // C(t)
-      for(int j=0; j<fc.Ntraj; ++j){
-        int l = 0;
-        for(int k=0; k<corrs[i]->get_corr_ndata(); ++k){
-          if(corrs[i]->include_data_pt(j,k)){ 
-            Cfit[j][l] = corrs[i]->get_data_pt(j,k);
-            l += 1;
+      // Loop through the raw data and store the points to fit
+      for(unsigned int i=0; i<fc.fits.size(); ++i)
+      {
+        // t
+        int t_min = fc.fits[i].t_min;
+        int t_max = fc.fits[i].t_max;
+        int t_len = t_max - t_min + 1;
+        for(int j=0; j<t_len; ++j){ 
+          fd.t[ii] = t_min+j; 
+          ii += 1; 
+        }
+        
+        // C(t)
+        for(int j=0; j<fc.Ntraj; ++j){
+          int l = 0;
+          for(int k=0; k<corrs[i]->get_corr_ndata(); ++k){
+            if(corrs[i]->include_data_pt(j,k)){ 
+              Cfit[j][l] = corrs[i]->get_data_pt(j,k);
+              l += 1;
+            }
           }
         }
       }
+      
+      if(jknife_idx >= 0){ Cfit.erase(Cfit.begin()+jknife_idx); }
+      
+      // Compute jackknife averages and errors
+      Cavg = jack_avg(Cfit);
+      Cstd = jack_std(Cfit, Cavg, true);
+      for(int i=0; i<fc.Ndata; ++i){ 
+        fd.C[i] = Cavg[i]; 
+        weights[i] = pow(Cstd[i],-2.0); 
+      }
     }
     
-    // Compute jackknife averages and errors
-    Cavg = jack_avg(Cfit);
-    Cstd = jack_std(Cfit, Cavg);
-    for(int i=0; i<fc.Ndata; ++i){ 
-      fd.C[i] = Cavg[i]; 
-      weights[i] = pow(Cstd[i],-2.0); 
+    // Initialize GSL objects
+    const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
+    gsl_multifit_fdfsolver *s;
+    int status, info;
+    gsl_matrix *J = gsl_matrix_alloc(fc.Ndata, fc.Nparams);
+    gsl_multifit_function_fdf f;
+    gsl_vector *p = gsl_vector_alloc(fc.Nparams);
+    gsl_vector_view w = gsl_vector_view_array(weights, fc.Ndata);
+    gsl_vector *res_f;
+    double chi, chi0;
+    
+    // Set initial params to user-supplied guesses
+    int p_idx(0);
+    for(unsigned int i=0; i<corrs.size(); ++i){
+      for(int j=0; j<corrs[i]->get_Np(); ++j){ 
+        gsl_vector_set(p, p_idx, fc.p0[i][j]);
+        ++p_idx;
+      }
     }
+
+    f.f = &Fitter::f_wrapper;
+    (fc.numerical_derivs) ? (f.df = NULL) : (f.df = &Fitter::df_wrapper);
+    f.n = fc.Ndata;
+    f.p = fc.Nparams;
+    f.params = &fd;
+
+    // Allocate and initialize GSL Levenberg-Marquardt solver
+    s = gsl_multifit_fdfsolver_alloc(T, fc.Ndata, fc.Nparams);
+    gsl_multifit_fdfsolver_wset(s, &f, p, &w.vector);
+
+    // Compute initial residual norm
+    res_f = gsl_multifit_fdfsolver_residual(s);
+    chi0 = gsl_blas_dnrm2(res_f);
+
+    // Solve the system
+    status = gsl_multifit_fdfsolver_driver(s, fc.max_iter, fc.xtol, fc.gtol, fc.ftol, &info);
+    gsl_multifit_fdfsolver_jac(s, J);
+
+    // Compute final residual
+    chi = gsl_blas_dnrm2(res_f);
+    
+    // Catch a weird GSL bug --- why does this happen !?
+    if((gsl_multifit_fdfsolver_niter(s) == 1) && (info != 1)){ 
+      printf("\nError: GSL is being tempermental. Try running the program again.\n\n"); 
+      exit(-1); 
+    }
+
+    // Summary of fit results
+    printf("\n** Summary from method '%s' **\n", gsl_multifit_fdfsolver_name(s));
+    printf("Status: %s\n", gsl_strerror(status));
+    printf("Number of iterations: %zu\n", gsl_multifit_fdfsolver_niter(s));
+    printf("Function evaluations: %zu\n", f.nevalf);
+    printf("Jacobian evaluations: %zu\n", f.nevaldf);
+    printf("Reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
+    printf("Initial chisq = %g\n", chi0);
+    printf("Final chisq = %g\n", chi);
+    { 
+      double dof = fc.Ndata - fc.Nparams;
+      printf("chisq/dof = %g\n",  pow(chi,2.0)/dof);
+      printf("Fit parameters:\n");
+      for(int i=0; i<fc.Nparams; ++i){
+        (jknife_idx == -1) ? (fr.p_cv[i] = gsl_vector_get(s->x,i)) : (fr.p_jacks[jknife_idx][i] = gsl_vector_get(s->x,i));
+        printf("  %s = %1.8e\n", fc.p_names[i].c_str(), gsl_vector_get(s->x,i));
+      }
+      (jknife_idx == -1) ? (fr.chi2pdof = pow(chi,2.0)/dof) : (chi2pdof_jacks[jknife_idx] = pow(chi,2.0)/dof);
+    }
+
+    // Clean up
+    gsl_multifit_fdfsolver_free(s);
+    gsl_matrix_free(J);
+    gsl_vector_free(p);
+    
+    delete[] fd.C;
+    delete[] fd.t;
+    delete[] weights;
   }
+    
+  fr.p_err = jack_std(fr.p_jacks, fr.p_cv, false);
+  fr.chi2pdof_err = jack_std(chi2pdof_jacks, fr.chi2pdof, false);
+  printf("\n----- done -----\n");
   
-  // Initialize GSL objects
-  const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
-  gsl_multifit_fdfsolver *s;
-  int status, info;
-  gsl_matrix *J = gsl_matrix_alloc(fc.Ndata, fc.Nparams);
-  gsl_matrix *covar = gsl_matrix_alloc (fc.Nparams, fc.Nparams);
-  gsl_multifit_function_fdf f;
-  gsl_vector *p = gsl_vector_alloc(fc.Nparams);
-  gsl_vector_view w = gsl_vector_view_array(weights, fc.Ndata);
-  gsl_vector *res_f;
-  double chi, chi0;
-  const double xtol = 1e-8;
-  const double gtol = 1e-8;
-  const double ftol = 0.0;
-  
-  // Set initial params to user-supplied guesses
-  int p_idx(0);
-  for(unsigned int i=0; i<corrs.size(); ++i){
-    for(int j=0; j<corrs[i]->get_Np(); ++j){ 
-      gsl_vector_set(p, p_idx, fc.p0[i][j]); 
-    }
+  return fr;
+}
+
+void Fitter::print_results(fit_results& fr)
+{
+  printf("\nFit results:\n");
+  for(unsigned int i=0; i<fr.p_cv.size(); ++i){
+    printf("  %s = %1.8e +/- %1.8e\n", fc.p_names[i].c_str(), fr.p_cv[i], fr.p_err[i]);
   }
-
-  f.f = &Fitter::f_wrapper;
-  f.df = &Fitter::df_wrapper;
-  f.n = fc.Ndata;
-  f.p = fc.Nparams;
-  f.params = &fd;
-
-  // Allocate and initialize GSL Levenberg-Marquardt solver
-  s = gsl_multifit_fdfsolver_alloc(T, fc.Ndata, fc.Nparams);
-  gsl_multifit_fdfsolver_wset(s, &f, p, &w.vector);
-
-  // Compute initial residual norm
-  res_f = gsl_multifit_fdfsolver_residual(s);
-  chi0 = gsl_blas_dnrm2(res_f);
-
-  // Solve the system with a maximum of 1000 iterations
-  status = gsl_multifit_fdfsolver_driver(s, 1000, xtol, gtol, ftol, &info);
-  gsl_multifit_fdfsolver_jac(s, J);
-  gsl_multifit_covar(J, 0.0, covar);
-
-  // Compute final residual
-  chi = gsl_blas_dnrm2(res_f);
-
-  // Summary of fit results
-  printf("\nsummary from method '%s'\n", gsl_multifit_fdfsolver_name(s));
-  printf("number of iterations: %zu\n", gsl_multifit_fdfsolver_niter(s));
-  printf("function evaluations: %zu\n", f.nevalf);
-  printf("Jacobian evaluations: %zu\n", f.nevaldf);
-  printf("reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
-  printf("initial |f(x)| = %g\n", chi0);
-  printf("final   |f(x)| = %g\n", chi);
-  { 
-    double dof = fc.Ndata - fc.Nparams;
-    double c = GSL_MAX_DBL(1.0, chi/sqrt(dof)); 
-    printf("chisq/dof = %g\n",  pow(chi,2.0)/dof);
-    for(int i=0; i<fc.Nparams; ++i){
-      printf("p[%d] = %.5f +/- %.5f\n", i, gsl_vector_get(s->x,i), c*sqrt(gsl_matrix_get(covar,i,i)));
-    }
-  }
-  printf("status = %s\n", gsl_strerror(status));
-
-  // Clean up
-  gsl_multifit_fdfsolver_free(s);
-  gsl_matrix_free(covar);
-  gsl_matrix_free(J);
-  gsl_vector_free(p);
-  delete[] fd.C;
-  delete[] fd.t;
-  delete[] weights;
+  printf("  chi^2/dof = %1.8e +/- %1.8e\n", fr.chi2pdof, fr.chi2pdof_err);
 }
 
 Fitter::~Fitter(){ for(unsigned int i=0; i<corrs.size(); ++i){ delete corrs[i]; } }

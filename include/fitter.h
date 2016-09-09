@@ -7,12 +7,11 @@
 #include "correlator.h"
 #include "fitter_controls.h"
 #include "xml_parser.h"
+#include "fit_results.h"
 
 class Fitter {
 private:
   fitter_controls fc;
-  std::vector<double> p;
-  std::vector<double> p_err;
   std::vector<Correlator*> corrs;
     
 public:
@@ -21,7 +20,8 @@ public:
   static int f_wrapper(const gsl_vector* x, void* data, gsl_vector* f);
   int df(const gsl_vector* x, void* data, gsl_matrix* J);
   static int df_wrapper(const gsl_vector* x, void* data, gsl_matrix* J);
-  void do_fit(void);
+  fit_results do_fit(void);
+  void print_results(fit_results& fr);
   ~Fitter();
 };
 

@@ -12,8 +12,6 @@ std::vector<double> tokenize_line(std::string& s, std::string& token);
 
 class Correlator {
 private:
-  // std::vector<double> t_fit;
-  // std::vector<double> C_fit;
   std::vector<std::vector<int>> include_in_fit;
   std::vector<std::vector<double>> t;
   std::vector<std::vector<double>> C;

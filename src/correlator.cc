@@ -12,9 +12,9 @@ std::vector<double> tokenize_line(std::string& s, std::string delim)
   std::string token;
   std::vector<double> tokens;
   
-  while(getline(iss,token,' ')){ tokens.push_back(atof(token.c_str())); }
-  if(tokens.size() != 2){ 
-    printf("Error: expected data format is Nx2 matrix of (t,C(t)) pairs.\n");
+  while(getline(iss,token,' ')){ if(!token.empty()){ tokens.push_back(atof(token.c_str())); } }
+  if(tokens.size() != 3){ 
+    printf("Error: expected data format is Nx3 matrix with format: (t,real(C(t)),imag(C(t))).\n");
     exit(-1);
   }
   
@@ -84,7 +84,10 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
   
   // Construct the appropriate FitFunc object for this fit form
   // The available forms are defined in include/fit_functions.h
-  if(fc.fits[this_fit].fit_type == "linear"){ f = new LinearFunc; }
+  double V = static_cast<double>( pow(fc.L,3)*fc.T );
+  if(fc.fits[this_fit].fit_type == "linear"){ f = new LinearFunc(); }
+  else if(fc.fits[this_fit].fit_type == "exp"){ f = new ExpFunc(V); }
+  else if(fc.fits[this_fit].fit_type == "cosh"){ f = new CoshFunc(fc.T,V); }
   else{ 
     printf("Error: unrecognized fit type %s\n", fc.fits[this_fit].fit_type.c_str()); 
     exit(-1); 

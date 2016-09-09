@@ -13,6 +13,13 @@ typedef struct {
 
 typedef struct {
   
+  // Levenberg-Marquardt parameters
+  int numerical_derivs;
+  int max_iter;
+  double xtol;
+  double gtol;
+  double ftol;
+  
   // Lattice volume
   int L;
   int T;
@@ -27,6 +34,7 @@ typedef struct {
   // Fit parameters
   int Ndata;
   int Nparams;
+  std::vector<std::string> p_names; // parameter names
   std::vector<std::vector<double>> p0; // initial guesses
   
   // Parameters for individual correlator fits
