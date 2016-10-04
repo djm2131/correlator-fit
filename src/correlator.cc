@@ -29,8 +29,8 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
   ////////////////////////////////////////////////////////////////
   // Read correlator data from disk. 
   //
-  // This assumes a file containing an Nx2 matrix formatted as
-  //    t   C(t)
+  // This assumes a file containing an Nx3 matrix formatted as
+  //    t   real(C(t))   imag(C(t))
   // for each trajectory included in the fit.
   // 3-pt functions should be treated as a simultaneous fit of a 
   // series of 2-pt correlators for each source-sink separation.

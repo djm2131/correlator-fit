@@ -78,12 +78,22 @@ int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J)
     for(int j=0; j<Ndat; ++j){
       df = corrs[i]->eval_derivs(t[y_idx],p);
       for(int k=0; k<fc.Nparams; ++k){ 
-        if((k >= k_offset) && (k <= k_offset+Np)){ gsl_matrix_set(J, y_idx, k, df[k-k_offset]); }
+        if((k >= k_offset) && (k < k_offset+Np)){ gsl_matrix_set(J, y_idx, k, df[k-k_offset]); }
         else{ gsl_matrix_set(J, y_idx, k, 0.0); }
       }
       ++y_idx;
     }
+    
+    k_offset += Np;
   }
+  
+  #if(0)
+  for(int i=0; i<fc.Ndata; ++i){
+  for(int j=0; j<fc.Nparams; ++j){
+    printf("J[%d,%d] = %1.6e\n", i, j, gsl_matrix_get(J,i,j));
+  } }
+  exit(0);
+  #endif
   
   return GSL_SUCCESS;
 }
@@ -112,11 +122,12 @@ fit_results Fitter::do_fit(void)
     fd.C = new double[fc.Ndata];
     fd.me = this;
     {
-      int ii = 0;
+      int ii(0);
       std::vector<double> Cavg(fc.Ndata), Cstd(fc.Ndata);
       std::vector<std::vector<double>> Cfit(fc.Ntraj, std::vector<double>(fc.Ndata,0.0));
       
       // Loop through the raw data and store the points to fit
+      int this_corr_start_idx(0);
       for(unsigned int i=0; i<fc.fits.size(); ++i)
       {
         // t
@@ -130,7 +141,7 @@ fit_results Fitter::do_fit(void)
         
         // C(t)
         for(int j=0; j<fc.Ntraj; ++j){
-          int l = 0;
+          int l = this_corr_start_idx;
           for(int k=0; k<corrs[i]->get_corr_ndata(); ++k){
             if(corrs[i]->include_data_pt(j,k)){ 
               Cfit[j][l] = corrs[i]->get_data_pt(j,k);
@@ -138,6 +149,8 @@ fit_results Fitter::do_fit(void)
             }
           }
         }
+        
+        this_corr_start_idx += t_len;
       }
       
       if(jknife_idx >= 0){ Cfit.erase(Cfit.begin()+jknife_idx); }
@@ -150,6 +163,12 @@ fit_results Fitter::do_fit(void)
         weights[i] = pow(Cstd[i],-2.0); 
       }
     }
+    
+    // Debug check
+    #if(0)
+      printf("fc.Ndata = %d\n", fc.Ndata);
+      for(int i=0; i<fc.Ndata; ++i){ printf("%e\t%e\t%e\n", fd.t[i], fd.C[i], pow(weights[i],-0.5)); }
+    #endif
     
     // Initialize GSL objects
     const gsl_multifit_fdfsolver_type *T = gsl_multifit_fdfsolver_lmsder;
