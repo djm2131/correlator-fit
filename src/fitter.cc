@@ -31,6 +31,33 @@ Fitter::Fitter(std::string xml_path)
   printf("\n----- done -----\n");
 }
 
+int Fitter::get_pidx(int corr_idx, int corr_p_idx)
+{
+  int p_idx(corr_p_idx);
+  for(int i=0; i<corr_idx; ++i){ p_idx += corrs[i]->get_Np(); }
+  return p_idx;
+}
+
+void Fitter::apply_constraints(const gsl_vector* x, std::vector<double>& p, int corr_idx)
+{
+  for(int i=0; i<corrs[i]->get_Np(); ++i){
+    for(unsigned int j=0; j<fc.p_bindings.size(); ++j){
+      if((fc.p_bindings[j][2] == corr_idx) && (fc.p_bindings[j][3] == i)){
+        p[i] = gsl_vector_get(x, get_pidx(fc.p_bindings[j][0], fc.p_bindings[j][1]));
+        break;
+      }
+    }
+  }
+}
+
+bool Fitter::include_param(int i)
+{
+  for(unsigned int j=0; j<fc.p_bindings.size(); ++j){
+    if(i == get_pidx(fc.p_bindings[j][2],fc.p_bindings[j][3])){ return false; }
+  }
+  return true;
+}
+
 int Fitter::f(const gsl_vector* x, void* data, gsl_vector* y)
 {
   double* t = ((fit_data*)data)->t;
@@ -43,6 +70,7 @@ int Fitter::f(const gsl_vector* x, void* data, gsl_vector* y)
     int Np = corrs[i]->get_Np();
     std::vector<double> p(Np);
     for(int j=0; j<Np; ++j){ p[j] = gsl_vector_get(x, p_idx); ++p_idx; }
+    if(fc.constrained_fit){ apply_constraints(x, p, i); }
     
     // Compute difference between fit and data for each data pt.
     int Ndat = fc.fits[i].t_max - fc.fits[i].t_min + 1;
@@ -73,6 +101,7 @@ int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J)
     int Np = corrs[i]->get_Np();
     std::vector<double> p(Np), df(Np);
     for(int j=0; j<Np; ++j){ p[j] = gsl_vector_get(x, p_idx); ++p_idx; }
+    if(fc.constrained_fit){ apply_constraints(x, p, i); }
     
     int Ndat = fc.fits[i].t_max - fc.fits[i].t_min + 1;
     for(int j=0; j<Ndat; ++j){
@@ -84,13 +113,26 @@ int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J)
       ++y_idx;
     }
     
+    // Apply constraints to derivatives
+    if(fc.constrained_fit){
+      for(int i=0; i<fc.Ndata; ++i){
+      for(unsigned int j=0; j<fc.p_bindings.size(); ++j){
+        int pidx_1 = get_pidx(fc.p_bindings[j][0],fc.p_bindings[j][1]);
+        int pidx_2 = get_pidx(fc.p_bindings[j][2],fc.p_bindings[j][3]);
+        double val_1 = gsl_matrix_get(J, i, pidx_1);
+        double val_2 = gsl_matrix_get(J, i, pidx_2);
+        if(val_1 != 0.0){ gsl_matrix_set(J, i, pidx_2, val_1); }
+        else if(val_2 != 0.0){ gsl_matrix_set(J, i, pidx_1, val_2); }
+      } }
+    }
+    
     k_offset += Np;
   }
   
   #if(0)
   for(int i=0; i<fc.Ndata; ++i){
   for(int j=0; j<fc.Nparams; ++j){
-    printf("J[%d,%d] = %1.6e\n", i, j, gsl_matrix_get(J,i,j));
+    printf("J[%d][%d] = %1.6e\n", i, j, gsl_matrix_get(J,i,j));
   } }
   exit(0);
   #endif
@@ -189,6 +231,14 @@ fit_results Fitter::do_fit(void)
         ++p_idx;
       }
     }
+    
+    // Apply constraints to initial guesses
+    for(unsigned int i=0; i<fc.p_bindings.size(); ++i){
+      int pidx_1 = get_pidx(fc.p_bindings[i][0],fc.p_bindings[i][1]);
+      int pidx_2 = get_pidx(fc.p_bindings[i][2],fc.p_bindings[i][3]);
+      double val = gsl_vector_get(p, pidx_1);
+      gsl_vector_set(p, pidx_2, val);
+    }
 
     f.f = &Fitter::f_wrapper;
     (fc.numerical_derivs) ? (f.df = NULL) : (f.df = &Fitter::df_wrapper);
@@ -210,12 +260,13 @@ fit_results Fitter::do_fit(void)
 
     // Compute final residual
     chi = gsl_blas_dnrm2(res_f);
-    
-    // Catch a weird GSL bug --- why does this happen !?
+   
+#if 0 // This should be fixed?
     if((gsl_multifit_fdfsolver_niter(s) == 1) && (info != 1)){ 
       printf("\nError: GSL is being tempermental. Try running the program again.\n\n"); 
       exit(-1); 
     }
+#endif
 
     // Summary of fit results
     printf("\n** Summary from method '%s' **\n", gsl_multifit_fdfsolver_name(s));
@@ -228,11 +279,19 @@ fit_results Fitter::do_fit(void)
     printf("Final chisq = %g\n", chi);
     { 
       double dof = fc.Ndata - fc.Nparams;
+      if(fc.constrained_fit){ dof += fc.p_bindings.size(); }
       printf("chisq/dof = %g\n",  pow(chi,2.0)/dof);
       printf("Fit parameters:\n");
       for(int i=0; i<fc.Nparams; ++i){
-        (jknife_idx == -1) ? (fr.p_cv[i] = gsl_vector_get(s->x,i)) : (fr.p_jacks[jknife_idx][i] = gsl_vector_get(s->x,i));
-        printf("  %s = %1.8e\n", fc.p_names[i].c_str(), gsl_vector_get(s->x,i));
+        if(fc.constrained_fit){ 
+          if(include_param(i)){ 
+            (jknife_idx == -1) ? (fr.p_cv[i] = gsl_vector_get(s->x,i)) : (fr.p_jacks[jknife_idx][i] = gsl_vector_get(s->x,i));
+            printf("  %s = %1.8e\n", fc.p_names[i].c_str(), gsl_vector_get(s->x,i)); 
+          }
+        } else {
+          (jknife_idx == -1) ? (fr.p_cv[i] = gsl_vector_get(s->x,i)) : (fr.p_jacks[jknife_idx][i] = gsl_vector_get(s->x,i));
+          printf("  %s = %1.8e\n", fc.p_names[i].c_str(), gsl_vector_get(s->x,i));
+        }
       }
       (jknife_idx == -1) ? (fr.chi2pdof = pow(chi,2.0)/dof) : (chi2pdof_jacks[jknife_idx] = pow(chi,2.0)/dof);
     }
@@ -258,7 +317,9 @@ void Fitter::print_results(fit_results& fr)
 {
   printf("\nFit results:\n");
   for(unsigned int i=0; i<fr.p_cv.size(); ++i){
-    printf("  %s = %1.8e +/- %1.8e\n", fc.p_names[i].c_str(), fr.p_cv[i], fr.p_err[i]);
+    if(include_param(i)){ 
+      printf("  %s = %1.8e +/- %1.8e\n", fc.p_names[i].c_str(), fr.p_cv[i], fr.p_err[i]); 
+    }
   }
   printf("  chi^2/dof = %1.8e +/- %1.8e\n", fr.chi2pdof, fr.chi2pdof_err);
 }

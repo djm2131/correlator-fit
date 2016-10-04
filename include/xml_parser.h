@@ -112,17 +112,17 @@ public:
     printf("  Ntraj = %d\n", fit_controls.Ntraj);
     printf("  bin_size = %d\n", fit_controls.bin_size);
   
-    printf("\nFound %d fit(s).\n", static_cast<int>(fit_controls.fits.size()));
+    printf("\nFound %d correlator(s).\n", static_cast<int>(fit_controls.fits.size()));
     int p_idx(0);
     for(unsigned int i=0; i<fit_controls.fits.size(); ++i){
-      printf("\nFit %d:\n", i);
+      printf("\nCorrelator %d:\n", i);
       printf("  t_min = %d\n", static_cast<int>(fit_controls.fits[i].t_min));
       printf("  t_max = %d\n", static_cast<int>(fit_controls.fits[i].t_max));
       printf("  data_stem = %s\n", fit_controls.fits[i].data_stem.c_str());
       printf("  fit_type = %s\n", fit_controls.fits[i].fit_type.c_str());
       printf("  initial guesses:\n");
       for(unsigned int j=0; j<fit_controls.p0[i].size(); ++j){
-        printf("    %s = %1.4e\n", fit_controls.p_names[p_idx].c_str(), fit_controls.p0[i][j]);
+        printf("    parameter %d: %s = %1.4e\n", j, fit_controls.p_names[p_idx].c_str(), fit_controls.p0[i][j]);
         ++p_idx;
       }
     }
@@ -149,13 +149,13 @@ public:
     fit_controls.Ntraj = ( fit_controls.traj_end - fit_controls.traj_start ) / fit_controls.traj_inc + 1;
     
     // Fill fit_controls.fits (fit_controls.p0) with the details (initial guesses) of each fit
-    int Nfits = get_Nnodes("/fit") - 2; // don't count LM or lattice params
+    int Nfits = get_Nnodes("/fit") - 3; // don't count LM, lattice params, or constraints
     fit_controls.p0.resize(Nfits);
     fit_controls.fits.resize(Nfits);
+    char path[100];
     for(int i=0; i<Nfits; ++i)
     {
       // fit parameters
-      char path[100];
       sprintf(path, "/fit/correlator[%d]/t_min", i+1);     fit_controls.fits[i].t_min = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/t_max", i+1);     fit_controls.fits[i].t_max = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/data_stem", i+1); fit_controls.fits[i].data_stem = parse_text(path);
@@ -174,6 +174,27 @@ public:
     fit_controls.p_names.push_back("chisq/dof");
     
     print_params(fit_controls);
+    
+    // Parse parameter bindings (if any are specified)
+    sprintf(path, "/fit/Constraints");
+    int Nc = get_Nnodes(path);
+    if(Nc > 0){
+      fit_controls.constrained_fit = true;
+      for(int i=0; i<Nc; ++i){ 
+        std::vector<int> this_constraint(4);
+        sprintf(path, "/fit/Constraints/param_bind[%d]/corr_1", i+1);  this_constraint[0] = parse_numeric(path);
+        sprintf(path, "/fit/Constraints/param_bind[%d]/param_1", i+1); this_constraint[1] = parse_numeric(path);
+        sprintf(path, "/fit/Constraints/param_bind[%d]/corr_2", i+1);  this_constraint[2] = parse_numeric(path);
+        sprintf(path, "/fit/Constraints/param_bind[%d]/param_2", i+1); this_constraint[3] = parse_numeric(path);
+        fit_controls.p_bindings.push_back(this_constraint); 
+        printf("\nBinding correlator %d parameter %d to correlator %d parameter %d.", 
+          this_constraint[0], this_constraint[1], this_constraint[2], this_constraint[3]);
+      }
+      printf("\n");
+    } else {
+      fit_controls.constrained_fit = false;
+      printf("\nPerforming unconstrained fit.\n");
+    }
     
     return fit_controls;
   }

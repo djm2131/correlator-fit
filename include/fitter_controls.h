@@ -39,6 +39,10 @@ typedef struct {
   
   // Parameters for individual correlator fits
   std::vector<fit_params> fits;
+  
+  // Constraints
+  bool constrained_fit;
+  std::vector<std::vector<int>> p_bindings;
 } fitter_controls;
 
 #endif
