@@ -15,6 +15,7 @@ private:
   std::vector<std::vector<int>> include_in_fit;
   std::vector<std::vector<double>> t;
   std::vector<std::vector<double>> C;
+  std::vector<std::vector<double>> w;
   FitFunc *f;
 
 public:  
@@ -23,6 +24,7 @@ public:
   int get_corr_ndata(){ return C[0].size(); } // total # of data pts. for this correlator (includes data not in fit)
   int get_Np(){ return f->get_Np(); }
   double get_data_pt(int i, int j){ return C[i][j]; }
+  double get_weights(int i, int j){ return w[i][j]; }
   double eval(double& t, std::vector<double>& p){ return f->eval(t,p); }
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){ return f->eval_derivs(t,p); }
   ~Correlator();

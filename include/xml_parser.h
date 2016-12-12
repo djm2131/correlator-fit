@@ -156,10 +156,16 @@ public:
     for(int i=0; i<Nfits; ++i)
     {
       // fit parameters
-      sprintf(path, "/fit/correlator[%d]/t_min", i+1);     fit_controls.fits[i].t_min = parse_numeric(path);
-      sprintf(path, "/fit/correlator[%d]/t_max", i+1);     fit_controls.fits[i].t_max = parse_numeric(path);
-      sprintf(path, "/fit/correlator[%d]/data_stem", i+1); fit_controls.fits[i].data_stem = parse_text(path);
-      sprintf(path, "/fit/correlator[%d]/fit_type", i+1);  fit_controls.fits[i].fit_type = parse_text(path);
+      sprintf(path, "/fit/correlator[%d]/resample", i+1);    fit_controls.fits[i].resample = (bool) parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/t_min", i+1);       fit_controls.fits[i].t_min = parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/t_max", i+1);       fit_controls.fits[i].t_max = parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/data_stem", i+1);   fit_controls.fits[i].data_stem = parse_text(path);
+      sprintf(path, "/fit/correlator[%d]/fit_type", i+1);    fit_controls.fits[i].fit_type = parse_text(path);
+      /*if(!fit_controls.fits[i].resample){
+        sprintf(path, "/fit/correlator[%d]/weight_stem", i+1); fit_controls.fits[i].weight_stem = parse_text(path);
+      } else {
+        fit_controls.fits[i].weight_stem = "";
+      }*/
       
       // initial guesses and parameter names
       sprintf(path, "/fit/correlator[%d]/parameter_guesses", i+1);
@@ -178,7 +184,7 @@ public:
     // Parse parameter bindings (if any are specified)
     sprintf(path, "/fit/Constraints");
     int Nc = get_Nnodes(path);
-    if(Nc > 0){
+    if(Nc > 0) {
       fit_controls.constrained_fit = true;
       for(int i=0; i<Nc; ++i){ 
         std::vector<int> this_constraint(4);

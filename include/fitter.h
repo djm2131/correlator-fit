@@ -13,12 +13,13 @@ class Fitter {
 private:
   fitter_controls fc;
   std::vector<Correlator*> corrs;
+  std::vector<std::vector<int>> bind_map;
     
 public:
   Fitter(std::string xml_path);
   int get_pidx(int corr_idx, int corr_p_idx);
   void apply_constraints(const gsl_vector* x, std::vector<double>& p, int corr_idx);
-  bool include_param(int i);
+  bool free_param(int i);
   int f(const gsl_vector* x, void* data, gsl_vector* f);
   static int f_wrapper(const gsl_vector* x, void* data, gsl_vector* f);
   int df(const gsl_vector* x, void* data, gsl_matrix* J);

@@ -39,6 +39,7 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
   fc.Ntraj = ( fc.traj_end - fc.traj_start + fc.traj_inc ) / fc.traj_inc;
   t.resize(fc.Ntraj); 
   C.resize(fc.Ntraj);
+  if(!fc.fits[this_fit].resample){ w.resize(fc.Ntraj); }
   include_in_fit.resize(fc.Ntraj);
   
   for(int i=0; i<fc.Ntraj; ++i)
@@ -61,6 +62,7 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
       tokens = tokenize_line(line, " ");
       t[i].push_back(tokens[0]);
       C[i].push_back(tokens[1]);
+      if(!fc.fits[this_fit].resample){ w[i].push_back( pow(tokens[2],-2.0) ); }
       if((tokens[0] >= fc.fits[this_fit].t_min) && (tokens[0] <= fc.fits[this_fit].t_max)){
         include_in_fit[i].push_back(1);
       } else {
@@ -82,18 +84,53 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
     traj += fc.traj_inc;
   }
   
+  // If we aren't resampling, append the results
+  // computed using all data to the beginning
+  if(!fc.fits[this_fit].resample){
+    std::stringstream ss;
+    ss << fc.fits[this_fit].data_stem;
+    std::ifstream in(ss.str());
+    if(!in.is_open()){ 
+      printf("Error: failed to open file %s\n", ss.str().c_str()); 
+      exit(-1); 
+    }
+    std::string line;
+    std::vector<double> tokens;
+    std::vector<double> t_tmp;
+    std::vector<double> C_tmp;
+    std::vector<double> w_tmp;
+    std::vector<int> include_tmp;
+    while(getline(in,line)){ 
+      tokens = tokenize_line(line, " ");
+      t_tmp.push_back(tokens[0]);
+      C_tmp.push_back(tokens[1]);
+      w_tmp.push_back(pow(tokens[2],-2.0));
+      if((tokens[0] >= fc.fits[this_fit].t_min) && (tokens[0] <= fc.fits[this_fit].t_max)){
+        include_tmp.push_back(1);
+      } else {
+        include_tmp.push_back(0);
+      }
+    }
+    t.insert(t.begin(), t_tmp);
+    C.insert(C.begin(), C_tmp);
+    w.insert(w.begin(), w_tmp);
+    include_in_fit.insert(include_in_fit.begin(), include_tmp);
+  }
+  
   // Construct the appropriate FitFunc object for this fit form
   // The available forms are defined in include/fit_functions.h
-  double V = static_cast<double>( pow(fc.L,3)*fc.T );
-  if(fc.fits[this_fit].fit_type == "linear"){ f = new LinearFunc(); }
+  // double V = static_cast<double>( pow(fc.L,3)*fc.T );
+  double V = static_cast<double>( pow(fc.L,3) );
+  if(fc.fits[this_fit].fit_type == "constant"){ f = new ConstFunc(); }
+  else if(fc.fits[this_fit].fit_type == "linear"){ f = new LinearFunc(); }
   else if(fc.fits[this_fit].fit_type == "exp"){ f = new ExpFunc(V); }
-  else if(fc.fits[this_fit].fit_type == "cosh"){ f = new CoshFunc(fc.T,V); }
+  else if(fc.fits[this_fit].fit_type == "cosh_pp"){ f = new CoshFuncPP(fc.T,V); }
+  else if(fc.fits[this_fit].fit_type == "cosh_ap"){ f = new CoshFuncAP(fc.T,V); }
+  else if(fc.fits[this_fit].fit_type == "cosh_decay"){ f = new CoshFuncDecay(fc.T,V); }
   else{ 
     printf("Error: unrecognized fit type %s\n", fc.fits[this_fit].fit_type.c_str()); 
     exit(-1); 
   }
-  
-  fc.Nparams += f->get_Np();
 }
 
 Correlator::~Correlator(){ delete f; }

@@ -33,6 +33,25 @@ public:
   virtual ~FitFunc(){}
 };
 
+// Constant function: y[t] = p[0]
+class ConstFunc : public FitFunc{
+    
+public:    
+  ConstFunc() : FitFunc() { Np = 1; FitType = "constant"; }
+    
+  double eval(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return p[0]; 
+  }
+  
+  std::vector<double> eval_derivs(double& t, std::vector<double>& p){
+    check_Np(p);
+    return {1.0};
+  }
+  
+  virtual ~ConstFunc(){}
+};
+
 // Linear function: y[t] = p[0] + p[1]*t
 class LinearFunc : public FitFunc{
     
@@ -52,7 +71,9 @@ public:
   virtual ~LinearFunc(){}
 };
 
-// Single exponential: y[t] = p[0]^2/(2.0*p[1]*V) * exp(-p[1]*t)
+// Single exponential: y[t] = Z^2/(2*m*V) * e^(-m*t)
+//  p[0] = Z
+//  p[1] = m
 class ExpFunc : public FitFunc{
   
 protected:
@@ -68,22 +89,24 @@ public:
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
     check_Np(p);
-    return { p[0]/(p[1]*V)*exp(-p[1]*t), 
+    return { p[0]/p[1]/V*exp(-p[1]*t), 
       -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V)*(1.0+p[1]*t)*exp(-p[1]*t) };
   }
   
   virtual ~ExpFunc(){}
 };
 
-// Cosh form: y[t] = p[0]^2/(2.0*p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) )
-class CoshFunc : public FitFunc{
+// Cosh form for <PP>: y[t] = Z^2/(2*m*V) * ( e^(-m*t) + e^(-m*(T-t)) )
+//  p[0] = Z
+//  p[1] = m
+class CoshFuncPP : public FitFunc{
   
 protected:
   double T;
   double V;
     
 public:    
-  CoshFunc(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 2; FitType = "cosh"; }
+  CoshFuncPP(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 2; FitType = "cosh_pp"; }
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
@@ -92,12 +115,71 @@ public:
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
     check_Np(p);
-    return { p[0]/(p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) ), 
+    return { p[0]/p[1]/V * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) ), 
       -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V) * ( (1.0+p[1]*t)*exp(-p[1]*t) + 
         (1.0+p[1]*(T-t))*exp(-p[1]*(T-t)) ) };
   }
   
-  virtual ~CoshFunc(){}
+  virtual ~CoshFuncPP(){}
+};
+
+// Cosh form for <AP>: y[t] = Z^2/(2*m*V) * ( e^(-m*t) - e^(-m*(T-t)) )
+//  p[0] = Z
+//  p[1] = m
+class CoshFuncAP : public FitFunc{
+  
+protected:
+  double T;
+  double V;
+    
+public:    
+  CoshFuncAP(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 2; FitType = "cosh_ap"; }
+    
+  double eval(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ); 
+  }
+  
+  std::vector<double> eval_derivs(double& t, std::vector<double>& p){
+    check_Np(p);
+    return { p[0]/p[1]/V * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ), 
+      -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V) * ( (1.0+p[1]*t)*exp(-p[1]*t) - 
+        (1.0+p[1]*(T-t))*exp(-p[1]*(T-t)) ) };
+  }
+  
+  virtual ~CoshFuncAP(){}
+};
+
+// Cosh form for global fits including decay constants: y[t] = Z*f*sqrt(V)/(2*ZA) * ( e^(-mt) - e^(-m*(T-t)) )
+//  p[0] = Z
+//  p[1] = m
+//  p[2] = ZA
+//  p[3] = f
+// The first three parameters should be bound to the Z-factor and mass of the corresponding <PP> correlator, and
+// the axial current renormalization factor ZA, respectively
+class CoshFuncDecay : public FitFunc{
+  
+protected:
+  double T;
+  double V;
+    
+public:    
+  CoshFuncDecay(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 4; FitType = "cosh_decay"; }
+    
+  double eval(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.5*p[0]*p[3]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ); 
+  }
+  
+  std::vector<double> eval_derivs(double& t, std::vector<double>& p){
+    check_Np(p);
+    return { 0.5*p[3]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ), 
+      -0.5*p[0]*p[3]/p[2] * ( t*exp(-p[1]*t) - (T-t)*exp(-p[1]*(T-t)) ),
+      -0.5*p[0]*p[3]/p[2]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ),
+      0.5*p[0]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ) };
+  }
+  
+  virtual ~CoshFuncDecay(){}
 };
 
 #endif

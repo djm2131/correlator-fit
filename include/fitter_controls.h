@@ -5,6 +5,7 @@
 #include <vector>
 
 typedef struct {
+  bool resample;
   std::string fit_type;
   std::string data_stem;
   double t_min;
@@ -32,9 +33,9 @@ typedef struct {
   int bin_size;
   
   // Fit parameters
-  int Ndata;
-  int Nparams;
-  std::vector<std::string> p_names; // parameter names
+  int Ndata;                           // # data points
+  int Nparams;                         // # fit parameters (ignoring constraints)
+  std::vector<std::string> p_names;    // parameter names
   std::vector<std::vector<double>> p0; // initial guesses
   
   // Parameters for individual correlator fits
