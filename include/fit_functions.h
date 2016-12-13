@@ -182,4 +182,32 @@ public:
   virtual ~CoshFuncDecay(){}
 };
 
+// Cosh form for two-pion correlator: y[t] = Z^2/(2*m*V) * ( e^{-m*t} + e^{-m*(T-t)} + C )
+//  p[0] = Z
+//  p[1] = m
+//  p[2] = C
+class CoshFuncTwoPion : public FitFunc{
+
+protected:
+  double T;
+  double V;
+  
+public:
+  CoshFuncTwoPion(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 3; FitType = "cosh_two_pion"; }
+  
+  double eval(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) + p[2] ); 
+  }
+  
+  std::vector<double> eval_derivs(double& t, std::vector<double>& p){
+    check_Np(p);
+    return { p[0]/p[1]/V * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) + p[2] ), 
+      -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V) * ( (1.0+p[1]*t)*exp(-p[1]*t) + 
+        (1.0+p[1]*(T-t))*exp(-p[1]*(T-t)) + p[2] ) ,
+        pow(p[0],2.0)/(2.0*p[1]*V) };
+  }
+  
+};
+
 #endif
