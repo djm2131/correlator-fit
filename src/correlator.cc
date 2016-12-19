@@ -54,7 +54,7 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
       printf("Error: failed to open file %s\n", ss.str().c_str()); 
       exit(-1); 
     }
-    
+
     // Parse line by line and store result
     std::string line;
     std::vector<double> tokens;

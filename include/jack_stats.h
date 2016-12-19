@@ -39,7 +39,7 @@ double jack_std(std::vector<double>& data, double& avg, bool resample)
   int Njks = data.size();
   double std(0.0);
   std::vector<double> jack_samples(Njks);
-  
+
   // Compute jackknife samples: 
   // jack_samples[i] is the mean of data without data[i]
   if(resample){
