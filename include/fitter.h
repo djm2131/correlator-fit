@@ -26,6 +26,8 @@ public:
   static int df_wrapper(const gsl_vector* x, void* data, gsl_matrix* J);
   fit_results do_fit(void);
   void print_results(fit_results& fr);
+  void compute_eff_mass(fit_results& fr);
+  void save_eff_mass(fit_results& fr);
   ~Fitter();
 };
 

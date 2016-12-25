@@ -6,8 +6,11 @@
 
 typedef struct {
   bool resample;
+  bool do_eff_mass;
   std::string fit_type;
+  std::string eff_mass_type;
   std::string data_stem;
+  std::string eff_mass_stem;
   double t_min;
   double t_max;
 } fit_params;

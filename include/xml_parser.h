@@ -119,7 +119,10 @@ public:
       printf("  t_min = %d\n", static_cast<int>(fit_controls.fits[i].t_min));
       printf("  t_max = %d\n", static_cast<int>(fit_controls.fits[i].t_max));
       printf("  data_stem = %s\n", fit_controls.fits[i].data_stem.c_str());
-      printf("  fit_type = %s\n", fit_controls.fits[i].fit_type.c_str());
+      if(fit_controls.fits[i].do_eff_mass){
+        printf("  eff_mass_stem = %s\n", fit_controls.fits[i].eff_mass_stem.c_str());
+        printf("  eff_mass_type = %s\n", fit_controls.fits[i].eff_mass_type.c_str());
+      }
       printf("  initial guesses:\n");
       for(unsigned int j=0; j<fit_controls.p0[i].size(); ++j){
         printf("    parameter %d: %s = %1.4e\n", j, fit_controls.p_names[p_idx].c_str(), fit_controls.p0[i][j]);
@@ -156,16 +159,14 @@ public:
     for(int i=0; i<Nfits; ++i)
     {
       // fit parameters
-      sprintf(path, "/fit/correlator[%d]/resample", i+1);    fit_controls.fits[i].resample = (bool) parse_numeric(path);
-      sprintf(path, "/fit/correlator[%d]/t_min", i+1);       fit_controls.fits[i].t_min = parse_numeric(path);
-      sprintf(path, "/fit/correlator[%d]/t_max", i+1);       fit_controls.fits[i].t_max = parse_numeric(path);
-      sprintf(path, "/fit/correlator[%d]/data_stem", i+1);   fit_controls.fits[i].data_stem = parse_text(path);
-      sprintf(path, "/fit/correlator[%d]/fit_type", i+1);    fit_controls.fits[i].fit_type = parse_text(path);
-      /*if(!fit_controls.fits[i].resample){
-        sprintf(path, "/fit/correlator[%d]/weight_stem", i+1); fit_controls.fits[i].weight_stem = parse_text(path);
-      } else {
-        fit_controls.fits[i].weight_stem = "";
-      }*/
+      sprintf(path, "/fit/correlator[%d]/resample", i+1);      fit_controls.fits[i].resample      = (bool) parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/do_eff_mass", i+1);   fit_controls.fits[i].do_eff_mass   = (bool) parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/t_min", i+1);         fit_controls.fits[i].t_min         = parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/t_max", i+1);         fit_controls.fits[i].t_max         = parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/data_stem", i+1);     fit_controls.fits[i].data_stem     = parse_text(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass_stem", i+1); fit_controls.fits[i].eff_mass_stem = parse_text(path);
+      sprintf(path, "/fit/correlator[%d]/fit_type", i+1);      fit_controls.fits[i].fit_type      = parse_text(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass_type", i+1); fit_controls.fits[i].eff_mass_type = parse_text(path);
       
       // initial guesses and parameter names
       sprintf(path, "/fit/correlator[%d]/parameter_guesses", i+1);

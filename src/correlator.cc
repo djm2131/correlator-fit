@@ -132,6 +132,20 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
     printf("Error: unrecognized fit type %s\n", fc.fits[this_fit].fit_type.c_str()); 
     exit(-1); 
   }
+  
+  // If we are computing the effective mass for this correlator,
+  // construct the appropriate EffMassFunc object as well.
+  if(fc.fits[this_fit].do_eff_mass){
+    if(fc.fits[this_fit].eff_mass_type == "constant"            ){ ef = new ConstEffMassFunc(); }
+    else if(fc.fits[this_fit].eff_mass_type == "log"            ){ ef = new LogEffMassFunc(); }
+    else if(fc.fits[this_fit].eff_mass_type == "cosh"           ){ ef = new CoshEffMassFunc(); }
+    else if(fc.fits[this_fit].eff_mass_type == "sinh" ||
+            fc.fits[this_fit].eff_mass_type == "subtracted_sinh"){ ef = new SinhEffMassFunc(); }
+    else { 
+      printf("Error: unrecognized effective mass type %s\n", fc.fits[this_fit].eff_mass_type.c_str()); 
+      exit(-1); 
+    }
+  }
 }
 
 Correlator::~Correlator(){ delete f; }

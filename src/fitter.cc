@@ -184,6 +184,9 @@ fit_results Fitter::do_fit(void)
   
   // Loop over jackknife samples
   // -1 is the fit to all data (central value)
+  // #ifdef USE_OMP
+  // #pragma omp parallel for
+  // #endif
   for(int jknife_idx=-1; jknife_idx<fc.Ntraj; ++jknife_idx)
   {
     if(jknife_idx == -1){ printf("\n----- Fitting to all data -----\n"); }
@@ -357,7 +360,94 @@ void Fitter::print_results(fit_results& fr)
       printf("  %s = %1.8e +/- %1.8e\n", fc.p_names[i].c_str(), fr.p_cv[i], fr.p_err[i]); 
     }
   }
-  printf("  chi^2/dof = %1.8e +/- %1.8e\n", fr.chi2pdof, fr.chi2pdof_err);
+  printf("  chi^2/dof = %1.8e +/- %1.8e\n\n", fr.chi2pdof, fr.chi2pdof_err);
+}
+
+// Computes effective mass and stores this in fit_results structure
+void Fitter::compute_eff_mass(fit_results& fr)
+{
+  int Ncorrs = static_cast<int>(corrs.size());
+  fr.effm.resize(Ncorrs);
+  
+  // Loop over correlators
+  for(int corr_idx=0; corr_idx<Ncorrs; ++corr_idx){
+  if(fc.fits[corr_idx].do_eff_mass){
+    printf("Computing effective mass type %s for correlator %d...", fc.fits[corr_idx].eff_mass_type.c_str(), corr_idx);
+    
+    int Ndata = corrs[corr_idx]->get_corr_ndata();
+    int npts_stencil = corrs[corr_idx]->get_stencil_size();
+    int npts_eff_mass = Ndata - npts_stencil + 1;
+    std::vector<std::vector<double>> eff_mass_jacks(fc.Ntraj+1, std::vector<double>(npts_eff_mass));
+    
+    // Initialize effective mass array
+    fr.effm[corr_idx].resize(npts_eff_mass);
+    for(int j=0; j<npts_eff_mass; ++j){ fr.effm[corr_idx][j].resize(3); }
+    
+    // Loop over jackknife samples for this correlator
+    for(int jknife_idx=-1; jknife_idx<fc.Ntraj; ++jknife_idx){
+      
+      std::vector<double> C_this_jack(Ndata);
+      std::vector<std::vector<double>> C(fc.Ntraj+1, std::vector<double>(Ndata));
+      
+      // If this is raw data to resample
+      if(fc.fits[corr_idx].resample){
+        
+        // Get raw data
+        std::vector<std::vector<double>> C(fc.Ntraj, std::vector<double>(Ndata));
+        for(int j=0; j<fc.Ntraj; ++j){
+        for(int k=0; k<Ndata; ++k){
+          C[j][k] = corrs[corr_idx]->get_data_pt(j,k);
+        }}
+        
+        // Delete one measurement for each jackknife sample
+        if(jknife_idx >= 0){ C.erase(C.begin()+jknife_idx); }
+        
+        // Compute jackknife average
+        C_this_jack = jack_avg(C);
+
+      } else { // if data is already resampled
+        
+        for(int k=0; k<Ndata; ++k){ 
+          C_this_jack[k] = corrs[corr_idx]->get_data_pt(jknife_idx+1, k); 
+        }
+        
+      }
+      
+      // Compute effective mass for each stencil
+      std::vector<double> stencil(npts_stencil);
+      for(int j=0; j<npts_eff_mass; ++j){
+        for(int k=0; k<npts_stencil; ++k){ stencil[k] = C_this_jack[j+k]; }
+        eff_mass_jacks[jknife_idx+1][j] = corrs[corr_idx]->eff_mass(stencil); 
+      }
+    }
+    
+    // Compute jackknifed effective mass
+    int start_idx = (npts_stencil%2 == 0) ? (npts_stencil/2-1) : ((npts_stencil-1)/2);
+    for(int j=0; j<npts_eff_mass; ++j){
+      fr.effm[corr_idx][j][0] = corrs[corr_idx]->get_time_slice(0,j+start_idx);
+      fr.effm[corr_idx][j][1] = eff_mass_jacks[0][j];
+    }
+    eff_mass_jacks.erase(eff_mass_jacks.begin());
+    std::vector<double> eff_mass_avg = jack_avg(eff_mass_jacks);
+    std::vector<double> eff_mass_err = jack_std(eff_mass_jacks, eff_mass_avg, false);
+    for(int j=0; j<npts_eff_mass; ++j){
+      fr.effm[corr_idx][j][2] = eff_mass_err[j];
+    }
+    
+    printf("done.\n");
+  }}
+}
+
+void Fitter::save_eff_mass(fit_results& fr)
+{
+  int Nc = static_cast<int>(corrs.size());
+  for(int i=0; i<Nc; ++i){
+  if(fc.fits[i].do_eff_mass){
+    printf("\n----- Correlator %d: effective mass type %s -----\n", i, fc.fits[i].eff_mass_type.c_str());
+    for(unsigned int j=0; j<fr.effm[i].size(); ++j){ 
+      printf("%3d %1.8e %1.8e\n", static_cast<int>(fr.effm[i][j][0]), fr.effm[i][j][1], fr.effm[i][j][2]); 
+    }
+  }}
 }
 
 Fitter::~Fitter(){ for(unsigned int i=0; i<corrs.size(); ++i){ delete corrs[i]; } }

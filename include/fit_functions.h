@@ -25,6 +25,8 @@ public:
   }
   
   int get_Np(void){ return Np; }
+  
+  virtual double get_mass(std::vector<double>& p) = 0;
     
   virtual double eval(double& t, std::vector<double>& p) = 0;
     
@@ -38,6 +40,8 @@ class ConstFunc : public FitFunc{
     
 public:    
   ConstFunc() : FitFunc() { Np = 1; FitType = "constant"; }
+  
+  double get_mass(std::vector<double>& p){ return p[0]; }
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
@@ -57,6 +61,8 @@ class LinearFunc : public FitFunc{
     
 public:    
   LinearFunc() : FitFunc() { Np = 2; FitType = "linear"; }
+  
+  double get_mass(std::vector<double>& p){ return p[1]; }
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
@@ -81,6 +87,8 @@ protected:
     
 public:    
   ExpFunc(double VV) : FitFunc(), V(VV) { Np = 2; FitType = "exp"; }
+  
+  double get_mass(std::vector<double>& p){ return p[1]; }
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
@@ -107,6 +115,8 @@ protected:
     
 public:    
   CoshFuncPP(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 2; FitType = "cosh_pp"; }
+  
+  double get_mass(std::vector<double>& p){ return p[1]; }
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
@@ -134,6 +144,8 @@ protected:
     
 public:    
   CoshFuncAP(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 2; FitType = "cosh_ap"; }
+  
+  double get_mass(std::vector<double>& p){ return p[1]; }
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
@@ -165,6 +177,8 @@ protected:
     
 public:    
   CoshFuncDecay(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 4; FitType = "cosh_decay"; }
+  
+  double get_mass(std::vector<double>& p){ return p[3]; }
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
@@ -194,6 +208,8 @@ protected:
   
 public:
   CoshFuncTwoPion(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 3; FitType = "cosh_two_pion"; }
+  
+  double get_mass(std::vector<double>& p){ return p[1]; }
   
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);

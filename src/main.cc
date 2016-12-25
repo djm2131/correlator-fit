@@ -15,6 +15,10 @@ int main(int argc, char **argv)
     Fitter fit(argv[1]);
     fr = fit.do_fit();
     fit.print_results(fr);
+    
+    // compute effective mass
+    fit.compute_eff_mass(fr);
+    fit.save_eff_mass(fr);
   }
 
   return(0);

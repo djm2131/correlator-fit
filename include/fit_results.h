@@ -7,6 +7,7 @@ typedef struct {
   std::vector<double> p_cv;
   std::vector<double> p_err;
   std::vector<std::vector<double>> p_jacks;
+  std::vector<std::vector<std::vector<double>>> effm;
 } fit_results;
 
 #endif
