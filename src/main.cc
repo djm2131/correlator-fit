@@ -16,7 +16,10 @@ int main(int argc, char **argv)
     fr = fit.do_fit();
     fit.print_results(fr);
     
-    // compute effective mass
+    // save fit parameters (for global fits)
+    fit.save_jacks(fr);
+    
+    // compute effective masses
     fit.compute_eff_mass(fr);
     fit.save_eff_mass(fr);
   }

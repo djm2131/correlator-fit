@@ -47,6 +47,11 @@ typedef struct {
   // Constraints
   bool constrained_fit;
   std::vector<std::vector<int>> p_bindings;
+  
+  // Output options
+  bool save_jacks;
+  std::string jacks_dir;
+  std::string eff_mass_dir;
 } fitter_controls;
 
 #endif

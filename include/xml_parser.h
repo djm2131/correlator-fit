@@ -152,7 +152,7 @@ public:
     fit_controls.Ntraj = ( fit_controls.traj_end - fit_controls.traj_start ) / fit_controls.traj_inc + 1;
     
     // Fill fit_controls.fits (fit_controls.p0) with the details (initial guesses) of each fit
-    int Nfits = get_Nnodes("/fit") - 3; // don't count LM, lattice params, or constraints
+    int Nfits = get_Nnodes("/fit") - 6; // FIXME: this is a bad design....
     fit_controls.p0.resize(Nfits);
     fit_controls.fits.resize(Nfits);
     char path[100];
@@ -202,6 +202,11 @@ public:
       fit_controls.constrained_fit = false;
       printf("\nPerforming unconstrained fit.\n");
     }
+    
+    // Parse output options
+    fit_controls.save_jacks   = (bool) parse_numeric("/fit/save_jacks");
+    fit_controls.jacks_dir    = parse_text("/fit/jacks_dir");
+    fit_controls.eff_mass_dir = parse_text("/fit/eff_mass_dir");
     
     return fit_controls;
   }

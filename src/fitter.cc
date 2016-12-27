@@ -355,24 +355,51 @@ fit_results Fitter::do_fit(void)
 void Fitter::print_results(fit_results& fr)
 {
   printf("\nFit results:\n");
-  for(unsigned int i=0; i<fr.p_cv.size(); ++i){
-    if(free_param(i)){ 
-      printf("  %s = %1.8e +/- %1.8e\n", fc.p_names[i].c_str(), fr.p_cv[i], fr.p_err[i]); 
-    }
-  }
+  for(int i=0; i<fc.Nparams; ++i){
+  if(free_param(i)){ 
+    printf("  %s = %1.8e +/- %1.8e\n", fc.p_names[i].c_str(), fr.p_cv[i], fr.p_err[i]); 
+  }}
   printf("  chi^2/dof = %1.8e +/- %1.8e\n\n", fr.chi2pdof, fr.chi2pdof_err);
+}
+
+void Fitter::save_jacks(fit_results& fr)
+{
+  printf("----- Saving fit parameters to dir %s -----", fc.jacks_dir.c_str());
+
+  for(int i=0; i<fc.Nparams; ++i){
+  if(free_param(i)){
+    
+    // central value
+    std::string fout_cv = fc.jacks_dir + "/" + fc.p_names[i] + ".dat";
+    FILE* fcv = fopen(fout_cv.c_str(), "w");
+    fprintf(fcv, "%1.8e\n", fr.p_cv[i]);
+    fclose(fcv);
+    
+    // jackknife samples
+    std::string fout_jacks = fc.jacks_dir + "/" + fc.p_names[i] + "_jacks.dat";
+    FILE* fj = fopen(fout_jacks.c_str(), "w");
+    for(int j=0; j<fc.Ntraj; ++j){
+      fprintf(fj, "%1.8e\n", fr.p_jacks[j][i]);
+    }
+    fclose(fj);
+    
+  }}
+  
+  printf("\n\n");
 }
 
 // Computes effective mass and stores this in fit_results structure
 void Fitter::compute_eff_mass(fit_results& fr)
 {
+  printf("----- Computing effective masses -----\n");
+  
   int Ncorrs = static_cast<int>(corrs.size());
   fr.effm.resize(Ncorrs);
   
   // Loop over correlators
   for(int corr_idx=0; corr_idx<Ncorrs; ++corr_idx){
   if(fc.fits[corr_idx].do_eff_mass){
-    printf("Computing effective mass type %s for correlator %d...", fc.fits[corr_idx].eff_mass_type.c_str(), corr_idx);
+    printf("  type %s for correlator %d...", fc.fits[corr_idx].eff_mass_type.c_str(), corr_idx);
     
     int Ndata = corrs[corr_idx]->get_corr_ndata();
     int npts_stencil = corrs[corr_idx]->get_stencil_size();
@@ -436,18 +463,25 @@ void Fitter::compute_eff_mass(fit_results& fr)
     
     printf("done.\n");
   }}
+  printf("\n");
 }
 
 void Fitter::save_eff_mass(fit_results& fr)
 {
+  printf("----- Saving effective masses to dir %s -----", fc.eff_mass_dir.c_str());
+  
   int Nc = static_cast<int>(corrs.size());
   for(int i=0; i<Nc; ++i){
   if(fc.fits[i].do_eff_mass){
-    printf("\n----- Correlator %d: effective mass type %s -----\n", i, fc.fits[i].eff_mass_type.c_str());
+    std::string fout = fc.eff_mass_dir + "/corr" + std::to_string(i) + ".dat";
+    FILE* f = fopen(fout.c_str(), "w");
     for(unsigned int j=0; j<fr.effm[i].size(); ++j){ 
-      printf("%3d %1.8e %1.8e\n", static_cast<int>(fr.effm[i][j][0]), fr.effm[i][j][1], fr.effm[i][j][2]); 
+      fprintf(f, "%3d %1.8e %1.8e\n", static_cast<int>(fr.effm[i][j][0]), fr.effm[i][j][1], fr.effm[i][j][2]); 
     }
+    fclose(f);
   }}
+  
+  printf("\n\n");
 }
 
 Fitter::~Fitter(){ for(unsigned int i=0; i<corrs.size(); ++i){ delete corrs[i]; } }
