@@ -7,6 +7,7 @@
 typedef struct {
   bool resample;
   bool do_eff_mass;
+  bool subtract_ts;
   std::string fit_type;
   std::string eff_mass_type;
   std::string data_stem;

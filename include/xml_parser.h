@@ -160,13 +160,16 @@ public:
     {
       // fit parameters
       sprintf(path, "/fit/correlator[%d]/resample", i+1);      fit_controls.fits[i].resample      = (bool) parse_numeric(path);
-      sprintf(path, "/fit/correlator[%d]/do_eff_mass", i+1);   fit_controls.fits[i].do_eff_mass   = (bool) parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/t_min", i+1);         fit_controls.fits[i].t_min         = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/t_max", i+1);         fit_controls.fits[i].t_max         = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/data_stem", i+1);     fit_controls.fits[i].data_stem     = parse_text(path);
-      sprintf(path, "/fit/correlator[%d]/eff_mass_stem", i+1); fit_controls.fits[i].eff_mass_stem = parse_text(path);
       sprintf(path, "/fit/correlator[%d]/fit_type", i+1);      fit_controls.fits[i].fit_type      = parse_text(path);
-      sprintf(path, "/fit/correlator[%d]/eff_mass_type", i+1); fit_controls.fits[i].eff_mass_type = parse_text(path);
+      
+      // effective mass controls
+      sprintf(path, "/fit/correlator[%d]/eff_mass/compute_eff_mass", i+1);       fit_controls.fits[i].do_eff_mass   = (bool) parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass/subtract_thermal_state", i+1); fit_controls.fits[i].subtract_ts   = (bool) parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass/eff_mass_type", i+1);          fit_controls.fits[i].eff_mass_type = parse_text(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass/eff_mass_stem", i+1);          fit_controls.fits[i].eff_mass_stem = parse_text(path);
       
       // initial guesses and parameter names
       sprintf(path, "/fit/correlator[%d]/parameter_guesses", i+1);

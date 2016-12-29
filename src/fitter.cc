@@ -397,72 +397,93 @@ void Fitter::compute_eff_mass(fit_results& fr)
   fr.effm.resize(Ncorrs);
   
   // Loop over correlators
+  int p_offset(0);
   for(int corr_idx=0; corr_idx<Ncorrs; ++corr_idx){
-  if(fc.fits[corr_idx].do_eff_mass){
-    printf("  type %s for correlator %d...", fc.fits[corr_idx].eff_mass_type.c_str(), corr_idx);
-    
-    int Ndata = corrs[corr_idx]->get_corr_ndata();
-    int npts_stencil = corrs[corr_idx]->get_stencil_size();
-    int npts_eff_mass = Ndata - npts_stencil + 1;
-    std::vector<std::vector<double>> eff_mass_jacks(fc.Ntraj+1, std::vector<double>(npts_eff_mass));
-    
-    // Initialize effective mass array
-    fr.effm[corr_idx].resize(npts_eff_mass);
-    for(int j=0; j<npts_eff_mass; ++j){ fr.effm[corr_idx][j].resize(3); }
-    
-    // Loop over jackknife samples for this correlator
-    for(int jknife_idx=-1; jknife_idx<fc.Ntraj; ++jknife_idx){
+    if(fc.fits[corr_idx].do_eff_mass){
+      printf("  type %s for correlator %d...", fc.fits[corr_idx].eff_mass_type.c_str(), corr_idx);
       
-      std::vector<double> C_this_jack(Ndata);
-      std::vector<std::vector<double>> C(fc.Ntraj+1, std::vector<double>(Ndata));
+      int Ndata = corrs[corr_idx]->get_corr_ndata();
+      int npts_stencil = corrs[corr_idx]->get_stencil_size();
+      int npts_eff_mass = Ndata - npts_stencil + 1;
+      std::vector<std::vector<double>> eff_mass_jacks(fc.Ntraj+1, std::vector<double>(npts_eff_mass));
       
-      // If this is raw data to resample
-      if(fc.fits[corr_idx].resample){
+      // Initialize effective mass array
+      fr.effm[corr_idx].resize(npts_eff_mass);
+      for(int j=0; j<npts_eff_mass; ++j){ fr.effm[corr_idx][j].resize(3); }
+      
+      // Loop over jackknife samples for this correlator
+      for(int jknife_idx=-1; jknife_idx<fc.Ntraj; ++jknife_idx){
         
-        // Get raw data
-        std::vector<std::vector<double>> C(fc.Ntraj, std::vector<double>(Ndata));
-        for(int j=0; j<fc.Ntraj; ++j){
-        for(int k=0; k<Ndata; ++k){
-          C[j][k] = corrs[corr_idx]->get_data_pt(j,k);
-        }}
+        std::vector<double> C_this_jack(Ndata);
+        std::vector<std::vector<double>> C(fc.Ntraj+1, std::vector<double>(Ndata));
         
-        // Delete one measurement for each jackknife sample
-        if(jknife_idx >= 0){ C.erase(C.begin()+jknife_idx); }
-        
-        // Compute jackknife average
-        C_this_jack = jack_avg(C);
+        // If this is raw data to resample
+        if(fc.fits[corr_idx].resample){
+          
+          // Get raw data
+          std::vector<std::vector<double>> C(fc.Ntraj, std::vector<double>(Ndata));
+          for(int j=0; j<fc.Ntraj; ++j){
+          for(int k=0; k<Ndata; ++k){
+            C[j][k] = corrs[corr_idx]->get_data_pt(j,k);
+          }}
+          
+          // Delete one measurement for each jackknife sample
+          if(jknife_idx >= 0){ C.erase(C.begin()+jknife_idx); }
+          
+          // Compute jackknife average
+          C_this_jack = jack_avg(C);
 
-      } else { // if data is already resampled
-        
-        for(int k=0; k<Ndata; ++k){ 
-          C_this_jack[k] = corrs[corr_idx]->get_data_pt(jknife_idx+1, k); 
+        } else { // if data is already resampled
+          
+          for(int k=0; k<Ndata; ++k){ 
+            C_this_jack[k] = corrs[corr_idx]->get_data_pt(jknife_idx+1, k); 
+          }
+          
         }
         
+        // If enabled, subtract out backward propagating state using fit
+        if(fc.fits[corr_idx].subtract_ts){
+          int Np = corrs[corr_idx]->get_Np();
+          double t;
+          std::vector<double> p(Np);
+          for(int k=0; k<Np; ++k){ 
+            int this_p = k + p_offset;
+            if(fc.constrained_fit && bind_map[this_p].size() != 0){ 
+              this_p = (this_p < bind_map[this_p][0]) ? this_p : bind_map[this_p][0]; 
+            } 
+            p[k] = (jknife_idx == -1) ? fr.p_cv[this_p] : fr.p_jacks[jknife_idx][this_p]; 
+          }
+          for(int j=0; j<Ndata; ++j){
+            t = corrs[corr_idx]->get_time_slice(0,j);
+            C_this_jack[j] -= corrs[corr_idx]->thermal_state(t,p);
+          }
+        }
+        
+        // Compute effective mass for each stencil
+        std::vector<double> stencil(npts_stencil);
+        for(int j=0; j<npts_eff_mass; ++j){
+          for(int k=0; k<npts_stencil; ++k){ stencil[k] = C_this_jack[j+k]; }
+          eff_mass_jacks[jknife_idx+1][j] = corrs[corr_idx]->eff_mass(stencil); 
+        }
       }
       
-      // Compute effective mass for each stencil
-      std::vector<double> stencil(npts_stencil);
+      // Compute jackknifed effective mass
+      int start_idx = (npts_stencil%2 == 0) ? (npts_stencil/2-1) : ((npts_stencil-1)/2);
       for(int j=0; j<npts_eff_mass; ++j){
-        for(int k=0; k<npts_stencil; ++k){ stencil[k] = C_this_jack[j+k]; }
-        eff_mass_jacks[jknife_idx+1][j] = corrs[corr_idx]->eff_mass(stencil); 
+        fr.effm[corr_idx][j][0] = corrs[corr_idx]->get_time_slice(0,j+start_idx);
+        fr.effm[corr_idx][j][1] = eff_mass_jacks[0][j];
       }
+      eff_mass_jacks.erase(eff_mass_jacks.begin());
+      std::vector<double> eff_mass_avg = jack_avg(eff_mass_jacks);
+      std::vector<double> eff_mass_err = jack_std(eff_mass_jacks, eff_mass_avg, false);
+      for(int j=0; j<npts_eff_mass; ++j){
+        fr.effm[corr_idx][j][2] = eff_mass_err[j];
+      }
+      
+      printf("done.\n");
     }
-    
-    // Compute jackknifed effective mass
-    int start_idx = (npts_stencil%2 == 0) ? (npts_stencil/2-1) : ((npts_stencil-1)/2);
-    for(int j=0; j<npts_eff_mass; ++j){
-      fr.effm[corr_idx][j][0] = corrs[corr_idx]->get_time_slice(0,j+start_idx);
-      fr.effm[corr_idx][j][1] = eff_mass_jacks[0][j];
-    }
-    eff_mass_jacks.erase(eff_mass_jacks.begin());
-    std::vector<double> eff_mass_avg = jack_avg(eff_mass_jacks);
-    std::vector<double> eff_mass_err = jack_std(eff_mass_jacks, eff_mass_avg, false);
-    for(int j=0; j<npts_eff_mass; ++j){
-      fr.effm[corr_idx][j][2] = eff_mass_err[j];
-    }
-    
-    printf("done.\n");
-  }}
+    p_offset += corrs[corr_idx]->get_Np();
+  }
   printf("\n");
 }
 

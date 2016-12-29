@@ -29,6 +29,8 @@ public:
   virtual double get_mass(std::vector<double>& p) = 0;
     
   virtual double eval(double& t, std::vector<double>& p) = 0;
+  
+  virtual double thermal_state(double& t, std::vector<double>& p) = 0;
     
   virtual std::vector<double> eval_derivs(double& t, std::vector<double>& p) = 0;
 
@@ -46,6 +48,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return p[0]; 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.0; 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -67,6 +74,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return p[0] + p[1]*t; 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.0; 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -93,6 +105,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return pow(p[0],2.0)/(2.0*p[1]*V)*exp(-p[1]*t); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.0; 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -123,6 +140,11 @@ public:
     return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) ); 
   }
   
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*V) * exp(-p[1]*(T-t)); 
+  }
+  
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
     check_Np(p);
     return { p[0]/p[1]/V * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) ), 
@@ -150,6 +172,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return -pow(p[0],2.0)/(2.0*p[1]*V) * exp(-p[1]*(T-t)); 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -185,6 +212,11 @@ public:
     return 0.5*p[0]*p[3]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ); 
   }
   
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return -0.5*p[0]*p[3]/p[2] * exp(-p[1]*(T-t)); 
+  }
+  
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
     check_Np(p);
     return { 0.5*p[3]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ), 
@@ -214,6 +246,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) + p[2] ); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*(T-t)) + p[2] ); 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
