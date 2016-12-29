@@ -5,6 +5,12 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+###################################################################
+## Plot effective mass function using outputs from correlator-fit.
+##
+## David Murphy (djm2131@columbia.edu)
+## 12/28/2016
+###################################################################
 
 plt.style.use('seaborn-pastel')
 plt.rcParams['font.family'] = 'serif'
@@ -18,11 +24,19 @@ plt.rcParams['ytick.labelsize'] = 12
 plt.rcParams['legend.fontsize'] = 12
 plt.rcParams['figure.titlesize'] = 16
 
-
 def usage():
-  print("./plot_eff_mass.py <options> <path-to-data> <path-to-out-file>")
+  print("Usage: ./plot_eff_mass.py <options> <path-to-data> <path-to-out-file>")
+  print("Options:")
+  print("  -legendloc <legend location>")
+  print("  -ylabel <label for y-axis>")
+  print("  -datalabel <legend lable for data pts.>")
+  print("  -xlim <x_min> <x_max>")
+  print("  -ylim <y_min> <y_max>")
+  print("  -tfit <t_min> <t_max>")
+  print("  -fit_data <cv> <jacks>")
+  print("Note: if -tfit is set the data pts. included in the fit are marked in red.")
+  print("Note: if -fit_data is also set the fitted mass and error is added to the plot.")
   exit(0)
-
 
 argc = len(sys.argv)
 if(argc < 3):
@@ -97,6 +111,9 @@ else:
 
 # Plot fit
 if fit_data[0]:
+  if np.isnan(t_fit[0]):
+    print("error: must supply fit range to use -fit_data option.")
+    exit(-1)
   cv = np.genfromtxt(fit_data[0])
   jacks = np.genfromtxt(fit_data[1])
   err = np.sqrt(len(jacks)-1.0)*np.std(jacks, ddof=0)

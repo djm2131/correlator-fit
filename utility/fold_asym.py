@@ -5,8 +5,8 @@ import sys
 import numpy as np
 
 #################################################################
-## A little utility function to fold a symmetric correlator
-## Useful for fixing sign errors in the data generation.
+## A little utility function to fold an antisymmetric correlator
+## about its midpoint.
 ##
 ## David Murphy (djm2131@columbia.edu)
 ## 12/28/2016
