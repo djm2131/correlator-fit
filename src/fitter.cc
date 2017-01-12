@@ -69,6 +69,15 @@ Fitter::Fitter(std::string xml_path)
     }}
   }
   
+  if(fc.constrained_fit){
+    for(int i=0; i<fc.Nparams; ++i){
+    if(free_param(i)){
+      fc.Nfreeparams += 1;
+    }}
+  } else {
+    fc.Nfreeparams = fc.Nparams;
+  }
+  
   printf("\n----- done -----\n");
 }
 
@@ -184,13 +193,14 @@ fit_results Fitter::do_fit(void)
   
   // Loop over jackknife samples
   // -1 is the fit to all data (central value)
-  // #ifdef USE_OMP
-  // #pragma omp parallel for
-  // #endif
+  #pragma omp parallel for
   for(int jknife_idx=-1; jknife_idx<fc.Ntraj; ++jknife_idx)
   {
-    if(jknife_idx == -1){ printf("\n----- Fitting to all data -----\n"); }
-    else{ printf("\n----- Jackknife sample %d of %d -----\n", jknife_idx+1, fc.Ntraj); }
+    #pragma omp critical
+    {
+      if(jknife_idx == -1){ printf("\n----- Fitting to all data -----\n"); }
+      else{ printf("\n----- Jackknife sample %d of %d -----\n", jknife_idx+1, fc.Ntraj); }
+    }
     
     double* weights = new double[fc.Ndata];
     fit_data fd;
@@ -307,15 +317,16 @@ fit_results Fitter::do_fit(void)
     chi = gsl_blas_dnrm2(res_f);
 
     // Summary of fit results
-    printf("\n** Summary from method '%s' **\n", gsl_multifit_fdfsolver_name(s));
-    printf("Status: %s\n", gsl_strerror(status));
-    printf("Number of iterations: %zu\n", gsl_multifit_fdfsolver_niter(s));
-    printf("Function evaluations: %zu\n", f.nevalf);
-    printf("Jacobian evaluations: %zu\n", f.nevaldf);
-    printf("Reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
-    printf("Initial chisq = %g\n", chi0);
-    printf("Final chisq = %g\n", chi);
-    { 
+    #pragma omp critical
+    {
+      printf("\n** Summary from method '%s' **\n", gsl_multifit_fdfsolver_name(s));
+      printf("Status: %s\n", gsl_strerror(status));
+      printf("Number of iterations: %zu\n", gsl_multifit_fdfsolver_niter(s));
+      printf("Function evaluations: %zu\n", f.nevalf);
+      printf("Jacobian evaluations: %zu\n", f.nevaldf);
+      printf("Reason for stopping: %s\n", (info == 1) ? "small step size" : "small gradient");
+      printf("Initial chisq = %g\n", chi0);
+      printf("Final chisq = %g\n", chi);
       double dof = fc.Ndata - fc.Nparams;
       if(fc.constrained_fit){ dof += fc.p_bindings.size(); }
       printf("chisq/dof = %g\n",  pow(chi,2.0)/dof);
@@ -489,13 +500,12 @@ void Fitter::compute_eff_mass(fit_results& fr)
 
 void Fitter::save_eff_mass(fit_results& fr)
 {
-  printf("----- Saving effective masses to dir %s -----", fc.eff_mass_dir.c_str());
+  printf("----- Saving effective masses -----");
   
   int Nc = static_cast<int>(corrs.size());
   for(int i=0; i<Nc; ++i){
   if(fc.fits[i].do_eff_mass){
-    std::string fout = fc.eff_mass_dir + "/corr" + std::to_string(i) + ".dat";
-    FILE* f = fopen(fout.c_str(), "w");
+    FILE* f = fopen(fc.fits[i].eff_mass_stem.c_str(), "w");
     for(unsigned int j=0; j<fr.effm[i].size(); ++j){ 
       fprintf(f, "%3d %1.8e %1.8e\n", static_cast<int>(fr.effm[i][j][0]), fr.effm[i][j][1], fr.effm[i][j][2]); 
     }

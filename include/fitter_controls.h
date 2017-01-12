@@ -14,6 +14,7 @@ typedef struct {
   std::string eff_mass_stem;
   double t_min;
   double t_max;
+  double t_sep;
 } fit_params;
 
 typedef struct {
@@ -39,6 +40,7 @@ typedef struct {
   // Fit parameters
   int Ndata;                           // # data points
   int Nparams;                         // # fit parameters (ignoring constraints)
+  int Nfreeparams;                     // # free parameters
   std::vector<std::string> p_names;    // parameter names
   std::vector<std::vector<double>> p0; // initial guesses
   
@@ -52,7 +54,6 @@ typedef struct {
   // Output options
   bool save_jacks;
   std::string jacks_dir;
-  std::string eff_mass_dir;
 } fitter_controls;
 
 #endif

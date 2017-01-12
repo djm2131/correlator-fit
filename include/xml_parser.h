@@ -148,11 +148,10 @@ public:
     fit_controls.traj_start = parse_numeric("/fit/Lattice/traj_start");
     fit_controls.traj_end = parse_numeric("/fit/Lattice/traj_end");
     fit_controls.traj_inc = parse_numeric("/fit/Lattice/traj_inc");
-    fit_controls.bin_size = parse_numeric("/fit/Lattice/bin_size");
     fit_controls.Ntraj = ( fit_controls.traj_end - fit_controls.traj_start ) / fit_controls.traj_inc + 1;
     
     // Fill fit_controls.fits (fit_controls.p0) with the details (initial guesses) of each fit
-    int Nfits = get_Nnodes("/fit") - 6; // FIXME: this is a bad design....
+    int Nfits = get_Nnodes("/fit") - 5; // FIXME: this is a bad design....
     fit_controls.p0.resize(Nfits);
     fit_controls.fits.resize(Nfits);
     char path[100];
@@ -162,6 +161,7 @@ public:
       sprintf(path, "/fit/correlator[%d]/resample", i+1);      fit_controls.fits[i].resample      = (bool) parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/t_min", i+1);         fit_controls.fits[i].t_min         = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/t_max", i+1);         fit_controls.fits[i].t_max         = parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/t_sep", i+1);         fit_controls.fits[i].t_sep         = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/data_stem", i+1);     fit_controls.fits[i].data_stem     = parse_text(path);
       sprintf(path, "/fit/correlator[%d]/fit_type", i+1);      fit_controls.fits[i].fit_type      = parse_text(path);
       
@@ -209,7 +209,6 @@ public:
     // Parse output options
     fit_controls.save_jacks   = (bool) parse_numeric("/fit/save_jacks");
     fit_controls.jacks_dir    = parse_text("/fit/jacks_dir");
-    fit_controls.eff_mass_dir = parse_text("/fit/eff_mass_dir");
     
     return fit_controls;
   }
