@@ -19,7 +19,8 @@ typedef struct {
 
 typedef struct {
   
-  // Levenberg-Marquardt parameters
+  // Fitter parameters
+  std::string algorithm;
   int numerical_derivs;
   int max_iter;
   double xtol;

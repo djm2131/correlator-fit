@@ -4,6 +4,10 @@
 #include <string>
 #include <cmath>
 
+template <typename T> double sgn(T val){
+  return static_cast<double>( (T(0) < val) - (val < T(0)) );
+}
+
 class FitFunc {
     
 protected:
@@ -121,8 +125,8 @@ public:
   virtual ~ExpFunc(){}
 };
 
-// TODO: FIXME: second term can also have negative overall sign....
-// Two-state exponential: y[t] = Z_1^2/(2*m_1*V) * e^(-m_1*t) + Z_2^2/(2*m_2*V) * e^(-m_2*t)
+// Two-state exponential: y[t] = Z_1^2/(2*m_1*V) * e^(-m_1*t) + sgn(Z_2)*Z_2^2/(2*m_2*V) * e^(-m_2*t)
+// Need to allow for Z_1 and Z_2 to have different relative signs
 //  p[0] = Z_1
 //  p[1] = m_1
 //  p[2] = Z_2
@@ -139,7 +143,7 @@ public:
     
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
-    return pow(p[0],2.0)/(2.0*p[1]*V)*exp(-p[1]*t) + pow(p[2],2.0)/(2.0*p[3]*V)*exp(-p[3]*t); 
+    return pow(p[0],2.0)/(2.0*p[1]*V)*exp(-p[1]*t) + sgn(p[2])*pow(p[2],2.0)/(2.0*p[3]*V)*exp(-p[3]*t); 
   }
   
   double thermal_state(double& t, std::vector<double>& p){ 
@@ -151,8 +155,8 @@ public:
     check_Np(p);
     return { p[0]/p[1]/V*exp(-p[1]*t), 
       -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V)*(1.0+p[1]*t)*exp(-p[1]*t),
-      p[2]/p[3]/V*exp(-p[3]*t), 
-      -pow(p[2],2.0)/(2.0*pow(p[3],2.0)*V)*(1.0+p[3]*t)*exp(-p[3]*t) };
+      sgn(p[2])*p[2]/p[3]/V*exp(-p[3]*t), 
+      -sgn(p[2])*pow(p[2],2.0)/(2.0*pow(p[3],2.0)*V)*(1.0+p[3]*t)*exp(-p[3]*t) };
   }
   
   virtual ~DoubleExpFunc(){} 

@@ -136,11 +136,12 @@ public:
     fitter_controls fit_controls;
     
     // Parse the Levenberg-Marquardt parameters
-    fit_controls.numerical_derivs = parse_numeric("/fit/LM_fitter/numerical_derivs");
-    fit_controls.max_iter = parse_numeric("/fit/LM_fitter/max_iter");
-    fit_controls.xtol = parse_numeric("/fit/LM_fitter/xtol");
-    fit_controls.gtol = parse_numeric("/fit/LM_fitter/gtol");
-    fit_controls.ftol = parse_numeric("/fit/LM_fitter/ftol");
+    fit_controls.algorithm = parse_text("/fit/fitter/algorithm");
+    fit_controls.numerical_derivs = parse_numeric("/fit/fitter/numerical_derivs");
+    fit_controls.max_iter = parse_numeric("/fit/fitter/max_iter");
+    fit_controls.xtol = parse_numeric("/fit/fitter/xtol");
+    fit_controls.gtol = parse_numeric("/fit/fitter/gtol");
+    fit_controls.ftol = parse_numeric("/fit/fitter/ftol");
     
     // Parse the lattice parameters
     fit_controls.L = parse_numeric("/fit/Lattice/L");
