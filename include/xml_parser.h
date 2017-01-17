@@ -136,11 +136,12 @@ public:
     fitter_controls fit_controls;
     
     // Parse the Levenberg-Marquardt parameters
-    fit_controls.numerical_derivs = parse_numeric("/fit/LM_fitter/numerical_derivs");
-    fit_controls.max_iter = parse_numeric("/fit/LM_fitter/max_iter");
-    fit_controls.xtol = parse_numeric("/fit/LM_fitter/xtol");
-    fit_controls.gtol = parse_numeric("/fit/LM_fitter/gtol");
-    fit_controls.ftol = parse_numeric("/fit/LM_fitter/ftol");
+    fit_controls.algorithm = parse_text("/fit/fitter/algorithm");
+    fit_controls.numerical_derivs = parse_numeric("/fit/fitter/numerical_derivs");
+    fit_controls.max_iter = parse_numeric("/fit/fitter/max_iter");
+    fit_controls.xtol = parse_numeric("/fit/fitter/xtol");
+    fit_controls.gtol = parse_numeric("/fit/fitter/gtol");
+    fit_controls.ftol = parse_numeric("/fit/fitter/ftol");
     
     // Parse the lattice parameters
     fit_controls.L = parse_numeric("/fit/Lattice/L");
@@ -148,11 +149,10 @@ public:
     fit_controls.traj_start = parse_numeric("/fit/Lattice/traj_start");
     fit_controls.traj_end = parse_numeric("/fit/Lattice/traj_end");
     fit_controls.traj_inc = parse_numeric("/fit/Lattice/traj_inc");
-    fit_controls.bin_size = parse_numeric("/fit/Lattice/bin_size");
     fit_controls.Ntraj = ( fit_controls.traj_end - fit_controls.traj_start ) / fit_controls.traj_inc + 1;
     
     // Fill fit_controls.fits (fit_controls.p0) with the details (initial guesses) of each fit
-    int Nfits = get_Nnodes("/fit") - 3; // don't count LM, lattice params, or constraints
+    int Nfits = get_Nnodes("/fit") - 5; // FIXME: this is a bad design....
     fit_controls.p0.resize(Nfits);
     fit_controls.fits.resize(Nfits);
     char path[100];
@@ -160,13 +160,17 @@ public:
     {
       // fit parameters
       sprintf(path, "/fit/correlator[%d]/resample", i+1);      fit_controls.fits[i].resample      = (bool) parse_numeric(path);
-      sprintf(path, "/fit/correlator[%d]/do_eff_mass", i+1);   fit_controls.fits[i].do_eff_mass   = (bool) parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/t_min", i+1);         fit_controls.fits[i].t_min         = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/t_max", i+1);         fit_controls.fits[i].t_max         = parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/t_sep", i+1);         fit_controls.fits[i].t_sep         = parse_numeric(path);
       sprintf(path, "/fit/correlator[%d]/data_stem", i+1);     fit_controls.fits[i].data_stem     = parse_text(path);
-      sprintf(path, "/fit/correlator[%d]/eff_mass_stem", i+1); fit_controls.fits[i].eff_mass_stem = parse_text(path);
       sprintf(path, "/fit/correlator[%d]/fit_type", i+1);      fit_controls.fits[i].fit_type      = parse_text(path);
-      sprintf(path, "/fit/correlator[%d]/eff_mass_type", i+1); fit_controls.fits[i].eff_mass_type = parse_text(path);
+      
+      // effective mass controls
+      sprintf(path, "/fit/correlator[%d]/eff_mass/compute_eff_mass", i+1);       fit_controls.fits[i].do_eff_mass   = (bool) parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass/subtract_thermal_state", i+1); fit_controls.fits[i].subtract_ts   = (bool) parse_numeric(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass/eff_mass_type", i+1);          fit_controls.fits[i].eff_mass_type = parse_text(path);
+      sprintf(path, "/fit/correlator[%d]/eff_mass/eff_mass_stem", i+1);          fit_controls.fits[i].eff_mass_stem = parse_text(path);
       
       // initial guesses and parameter names
       sprintf(path, "/fit/correlator[%d]/parameter_guesses", i+1);
@@ -202,6 +206,10 @@ public:
       fit_controls.constrained_fit = false;
       printf("\nPerforming unconstrained fit.\n");
     }
+    
+    // Parse output options
+    fit_controls.save_jacks   = (bool) parse_numeric("/fit/save_jacks");
+    fit_controls.jacks_dir    = parse_text("/fit/jacks_dir");
     
     return fit_controls;
   }

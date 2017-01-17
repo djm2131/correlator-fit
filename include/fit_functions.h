@@ -4,6 +4,10 @@
 #include <string>
 #include <cmath>
 
+template <typename T> double sgn(T val){
+  return static_cast<double>( (T(0) < val) - (val < T(0)) );
+}
+
 class FitFunc {
     
 protected:
@@ -29,6 +33,8 @@ public:
   virtual double get_mass(std::vector<double>& p) = 0;
     
   virtual double eval(double& t, std::vector<double>& p) = 0;
+  
+  virtual double thermal_state(double& t, std::vector<double>& p) = 0;
     
   virtual std::vector<double> eval_derivs(double& t, std::vector<double>& p) = 0;
 
@@ -46,6 +52,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return p[0]; 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.0; 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -67,6 +78,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return p[0] + p[1]*t; 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.0; 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -95,6 +111,11 @@ public:
     return pow(p[0],2.0)/(2.0*p[1]*V)*exp(-p[1]*t); 
   }
   
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.0; 
+  }
+  
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
     check_Np(p);
     return { p[0]/p[1]/V*exp(-p[1]*t), 
@@ -102,6 +123,43 @@ public:
   }
   
   virtual ~ExpFunc(){}
+};
+
+// Two-state exponential: y[t] = Z_1^2/(2*m_1*V) * e^(-m_1*t) + sgn(Z_2)*Z_2^2/(2*m_2*V) * e^(-m_2*t)
+// Need to allow for Z_1 and Z_2 to have different relative signs
+//  p[0] = Z_1
+//  p[1] = m_1
+//  p[2] = Z_2
+//  p[3] = m_2
+class DoubleExpFunc : public FitFunc{
+  
+protected:
+  double V;
+    
+public:    
+  DoubleExpFunc(double VV) : FitFunc(), V(VV) { Np = 4; FitType = "double_exp"; }
+  
+  double get_mass(std::vector<double>& p){ return p[1]; } // ground state mass
+    
+  double eval(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*V)*exp(-p[1]*t) + sgn(p[2])*pow(p[2],2.0)/(2.0*p[3]*V)*exp(-p[3]*t); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return 0.0; 
+  }
+  
+  std::vector<double> eval_derivs(double& t, std::vector<double>& p){
+    check_Np(p);
+    return { p[0]/p[1]/V*exp(-p[1]*t), 
+      -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V)*(1.0+p[1]*t)*exp(-p[1]*t),
+      sgn(p[2])*p[2]/p[3]/V*exp(-p[3]*t), 
+      -sgn(p[2])*pow(p[2],2.0)/(2.0*pow(p[3],2.0)*V)*(1.0+p[3]*t)*exp(-p[3]*t) };
+  }
+  
+  virtual ~DoubleExpFunc(){} 
 };
 
 // Cosh form for <PP>: y[t] = Z^2/(2*m*V) * ( e^(-m*t) + e^(-m*(T-t)) )
@@ -121,6 +179,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) ); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*V) * exp(-p[1]*(T-t)); 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -150,6 +213,11 @@ public:
   double eval(double& t, std::vector<double>& p){ 
     check_Np(p);
     return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return -pow(p[0],2.0)/(2.0*p[1]*V) * exp(-p[1]*(T-t)); 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -185,6 +253,11 @@ public:
     return 0.5*p[0]*p[3]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ); 
   }
   
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return -0.5*p[0]*p[3]/p[2] * exp(-p[1]*(T-t)); 
+  }
+  
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
     check_Np(p);
     return { 0.5*p[3]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) ), 
@@ -216,6 +289,11 @@ public:
     return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) + p[2] ); 
   }
   
+  double thermal_state(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*(T-t)) + p[2] ); 
+  }
+  
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
     check_Np(p);
     return { p[0]/p[1]/V * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) + p[2] ), 
@@ -224,6 +302,39 @@ public:
         pow(p[0],2.0)/(2.0*p[1]*V) };
   }
   
+};
+
+// For global fits including ZV measured through EM current: y[t_sep] = 1/ZV * Z^2/(2*m*V) * e^{-m*\Delta t_sep}
+//  p[0] = Z
+//  p[1] = m
+//  p[2] = ZV
+class ZVFunc : public FitFunc{
+  
+protected:
+  double T;
+  double V;
+  double dt; // source-sink separation
+    
+public:    
+  ZVFunc(double TT, double VV, double dtt) : FitFunc(), T(TT), V(VV), dt(dtt) { Np = 3; FitType = "zv"; }
+  
+  double get_mass(std::vector<double>& p){ return 0.0; }
+    
+  double eval(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    return pow(p[0],2.0)/(2.0*p[1]*p[2]*V) * exp(-p[1]*dt); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ return 0.0; }
+  
+  std::vector<double> eval_derivs(double& t, std::vector<double>& p){
+    check_Np(p);
+    return { p[0]/p[1]/p[2]/V * exp(-p[1]*dt), 
+             -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*p[2]*V) * (1.0+p[1]*dt)*exp(-p[1]*dt), 
+             -pow(p[0],2.0)/(2.0*p[1]*pow(p[2],2.0)*V) * exp(-p[1]*dt) };
+  }
+  
+  virtual ~ZVFunc(){}
 };
 
 #endif

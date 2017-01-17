@@ -36,7 +36,6 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
   // series of 2-pt correlators for each source-sink separation.
   ////////////////////////////////////////////////////////////////
   int traj = fc.traj_start;
-  fc.Ntraj = ( fc.traj_end - fc.traj_start + fc.traj_inc ) / fc.traj_inc;
   t.resize(fc.Ntraj); 
   C.resize(fc.Ntraj);
   if(!fc.fits[this_fit].resample){ w.resize(fc.Ntraj); }
@@ -121,13 +120,15 @@ Correlator::Correlator(fitter_controls& fc, int this_fit)
   // The available forms are defined in include/fit_functions.h
   // double V = static_cast<double>( pow(fc.L,3)*fc.T );
   double V = static_cast<double>( pow(fc.L,3) );
-  if     (fc.fits[this_fit].fit_type == "constant"     ){ f = new ConstFunc();             }
-  else if(fc.fits[this_fit].fit_type == "linear"       ){ f = new LinearFunc();            }
-  else if(fc.fits[this_fit].fit_type == "exp"          ){ f = new ExpFunc(V);              }
-  else if(fc.fits[this_fit].fit_type == "cosh_pp"      ){ f = new CoshFuncPP(fc.T,V);      }
-  else if(fc.fits[this_fit].fit_type == "cosh_ap"      ){ f = new CoshFuncAP(fc.T,V);      }
-  else if(fc.fits[this_fit].fit_type == "cosh_decay"   ){ f = new CoshFuncDecay(fc.T,V);   }
-  else if(fc.fits[this_fit].fit_type == "cosh_two_pion"){ f = new CoshFuncTwoPion(fc.T,V); }
+  if     (fc.fits[this_fit].fit_type == "constant"     ){ f = new ConstFunc();                              }
+  else if(fc.fits[this_fit].fit_type == "linear"       ){ f = new LinearFunc();                             }
+  else if(fc.fits[this_fit].fit_type == "exp"          ){ f = new ExpFunc(V);                               }
+  else if(fc.fits[this_fit].fit_type == "double_exp"   ){ f = new DoubleExpFunc(V);                         }
+  else if(fc.fits[this_fit].fit_type == "cosh_pp"      ){ f = new CoshFuncPP(fc.T, V);                      } 
+  else if(fc.fits[this_fit].fit_type == "cosh_ap"      ){ f = new CoshFuncAP(fc.T, V);                      }
+  else if(fc.fits[this_fit].fit_type == "cosh_decay"   ){ f = new CoshFuncDecay(fc.T, V);                   }
+  else if(fc.fits[this_fit].fit_type == "cosh_two_pion"){ f = new CoshFuncTwoPion(fc.T,V);                  }
+  else if(fc.fits[this_fit].fit_type == "zv"           ){ f = new ZVFunc(fc.T, V, fc.fits[this_fit].t_sep); }
   else{ 
     printf("Error: unrecognized fit type %s\n", fc.fits[this_fit].fit_type.c_str()); 
     exit(-1); 
