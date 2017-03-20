@@ -291,7 +291,8 @@ public:
   
   double thermal_state(double& t, std::vector<double>& p){ 
     check_Np(p);
-    return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*(T-t)) + p[2] ); 
+    // return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*(T-t)) + p[2] ); 
+    return pow(p[0],2.0)/(2.0*p[1]*V)*p[2]; 
   }
   
   std::vector<double> eval_derivs(double& t, std::vector<double>& p){
@@ -300,6 +301,41 @@ public:
       -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V) * ( (1.0+p[1]*t)*exp(-p[1]*t) + 
         (1.0+p[1]*(T-t))*exp(-p[1]*(T-t)) + p[2] ) ,
         pow(p[0],2.0)/(2.0*p[1]*V) };
+  }
+  
+};
+
+// Ratio form for two-pion correlator: R[t+1/2] = Z * ( cosh(dE*(t+1/2-T/2)) + sinh(dE*(t+1/2-T/2))*coth(2*m*(t+1/2-T/2)) )
+//  p[0] = Z
+//  p[1] = m
+//  p[2] = dE
+class TwoPionRatioFunc : public FitFunc{
+
+protected:
+  double T;
+  double V;
+  
+public:
+  TwoPionRatioFunc(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 3; FitType = "ratio_two_pion"; }
+  
+  double get_mass(std::vector<double>& p){ return p[1]; }
+  
+  double eval(double& t, std::vector<double>& p){ 
+    check_Np(p);
+    // double tp = t + 0.5*(1.0-T);
+    double tp = t - 0.5*T;
+    return p[0] * ( cosh(p[2]*tp) + sinh(p[2]*tp)/tanh(2.0*p[1]*tp) ); 
+  }
+  
+  double thermal_state(double& t, std::vector<double>& p){ return 0.0; }
+  
+  std::vector<double> eval_derivs(double& t, std::vector<double>& p){
+    check_Np(p);
+    // double tp = t + 0.5*(1.0-T);
+    double tp = t - 0.5*T;
+    return { cosh(p[2]*tp) + sinh(p[2]*tp)/tanh(2.0*p[1]*tp), 
+      -2.0*p[0]*tp*sinh(p[2]*tp)/pow(sinh(2.0*p[1]*tp),2),
+      p[0]*tp*cosh((2.0*p[1]+p[2])*tp)/sinh(2.0*p[1]*tp) };
   }
   
 };
