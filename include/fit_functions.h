@@ -387,4 +387,41 @@ class ZVFunc : public FitFunc
     ~ZVFunc() override = default;
 };
 
+// Bag parameter ansatz: y[t_sep] = 2.0/3.0 * B * V*Z^2*f^2/Z_A^2 * e^{-m*\Delta t_sep}
+//  p[0] = Z
+//  p[1] = m
+//  p[2] = ZA
+//  p[3] = f
+//  p[4] = B
+class BKFunc : public FitFunc
+{
+  protected:
+    double T;
+    double V;
+    double dt; // source-sink separation
+
+  public:    
+    BKFunc(double TT, double VV, double dtt) : FitFunc(), T(TT), V(VV), dt(dtt) { Np = 5; FitType = "bk"; }
+
+    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
+
+    double eval(double& t, std::vector<double>& p) const override { 
+      check_Np(p);
+      return 2.0/3.0*p[4]*pow(p[0]*p[3]*V/p[2],2) * exp(-p[1]*dt); 
+    }
+
+    double thermal_state(double& t, std::vector<double>& p) const override { return 0.0; }
+
+    std::vector<double> eval_derivs(double& t, std::vector<double>& p) const override {
+      check_Np(p);
+      return {  4.0/3.0*p[4]*p[0]*pow(p[3]*V/p[2],2) * exp(-p[1]*dt), 
+               -2.0/3.0*p[4]*dt*pow(p[0]*p[3]*V/p[2],2) * exp(-p[1]*dt), 
+               -4.0/3.0*p[4]*pow(p[0]*p[3]*V,2)/pow(p[2],3) * exp(-p[1]*dt),
+                4.0/3.0*p[4]*p[3]*pow(p[0]*V/p[2],2) * exp(-p[1]*dt),
+                2.0/3.0*pow(p[0]*p[3]*V/p[2],2) * exp(-p[1]*dt)              };
+    }
+
+    ~BKFunc() override = default;
+};
+
 #endif 

@@ -144,6 +144,7 @@ Correlator::Correlator(fitter_controls& fc, const int& this_fit)
   else if(fc.fits[this_fit].fit_type == "cosh_two_pion" ){ f = new CoshFuncTwoPion(fc.T,V);                  }
   else if(fc.fits[this_fit].fit_type == "ratio_two_pion"){ f = new TwoPionRatioFunc(fc.T,V);                 }
   else if(fc.fits[this_fit].fit_type == "zv"            ){ f = new ZVFunc(fc.T, V, fc.fits[this_fit].t_sep); }
+  else if(fc.fits[this_fit].fit_type == "bk"            ){ f = new BKFunc(fc.T, V, fc.fits[this_fit].t_sep); }
   else{
     printf("Error: unrecognized fit type %s\n", fc.fits[this_fit].fit_type.c_str());
     exit(-1);
