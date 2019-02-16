@@ -38,6 +38,8 @@ typedef struct {
   double xtol;
   double gtol;
   double ftol;
+  bool correlated_fits;
+  double svd_cut;
 
   // Lattice volume
   int L;

@@ -116,6 +116,8 @@ class XML_parser{
       printf("  xtol = %e\n", fit_controls.xtol);
       printf("  gtol = %e\n", fit_controls.gtol);
       printf("  ftol = %e\n", fit_controls.ftol);
+      printf("  correlated_fits = %d\n", static_cast<int>(fit_controls.correlated_fits));
+      printf("  svd_cut = %g\n", fit_controls.svd_cut);
 
       printf("\nLattice parameters:\n");
       printf("  L = %d\n", fit_controls.L);
@@ -156,6 +158,8 @@ class XML_parser{
       fit_controls.xtol             = parse_numeric("/fit/fitter/xtol");
       fit_controls.gtol             = parse_numeric("/fit/fitter/gtol");
       fit_controls.ftol             = parse_numeric("/fit/fitter/ftol");
+      fit_controls.correlated_fits  = static_cast<bool>( parse_numeric("/fit/fitter/correlated_fits") );
+      fit_controls.svd_cut          = parse_numeric("/fit/fitter/svd_cut");
 
       // Parse the lattice parameters
       fit_controls.L          = static_cast<int>( parse_numeric("/fit/Lattice/L") );
