@@ -44,7 +44,6 @@ class Correlator
     size_t get_Np() const { return f->get_Np(); }
     size_t get_stencil_size() const { return ef->get_stencil_size(); }
 
-    const double& get_mass(std::vector<double>& p) const { return f->get_mass(p); }
     const double& get_time_slice(int i, int j) const { return t[i][j]; }
     const double& get_data_pt(int i, int j) const { return C[i][j]; }
     const double& get_weights(int i, int j) const { return w[i][j]; }

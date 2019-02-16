@@ -42,8 +42,6 @@ class FitFunc
 
     const size_t& get_Np() const { return Np; }
 
-    virtual const double& get_mass(std::vector<double>& p) const = 0;
-
     virtual double eval(double& t, std::vector<double>& p) const = 0;
 
     virtual double thermal_state(double& t, std::vector<double>& p) const = 0;
@@ -58,8 +56,6 @@ class ConstFunc : public FitFunc
 {
   public:
     ConstFunc() : FitFunc() { Np = 1; FitType = "constant"; }
-
-    const double& get_mass(std::vector<double>& p) const override { return p[0]; }
 
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
@@ -84,8 +80,6 @@ class LinearFunc : public FitFunc
 {
   public:
     LinearFunc() : FitFunc() { Np = 2; FitType = "linear"; }
-
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
 
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
@@ -115,8 +109,6 @@ class ExpFunc : public FitFunc
 
   public:
     explicit ExpFunc(double VV) : FitFunc(), V(VV) { Np = 2; FitType = "exp"; }
-
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
 
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
@@ -151,8 +143,6 @@ class DoubleExpFunc : public FitFunc
   public:
     explicit DoubleExpFunc(double VV) : FitFunc(), V(VV) { Np = 4; FitType = "double_exp"; }
 
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; } // ground state mass
-
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
       return pow(p[0],2.0)/(2.0*p[1]*V)*exp(-p[1]*t) + sgn(p[2])*pow(p[2],2.0)/(2.0*p[3]*V)*exp(-p[3]*t);
@@ -186,8 +176,6 @@ class CoshFuncPP : public FitFunc
   public:
     CoshFuncPP(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 2; FitType = "cosh_pp"; }
 
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
-
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
       return pow(p[0],2.0)/(2.0*p[1]*V) * ( exp(-p[1]*t) + exp(-p[1]*(T-t)) );
@@ -219,8 +207,6 @@ class CoshFuncAP : public FitFunc
 
   public:
     CoshFuncAP(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 2; FitType = "cosh_ap"; }
-
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
 
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
@@ -258,8 +244,6 @@ class CoshFuncDecay : public FitFunc
   public:
     CoshFuncDecay(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 4; FitType = "cosh_decay"; }
 
-    const double& get_mass(std::vector<double>& p) const override { return p[3]; }
-
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
       return 0.5*p[0]*p[3]/p[2] * ( exp(-p[1]*t) - exp(-p[1]*(T-t)) );
@@ -293,8 +277,6 @@ class CoshFuncTwoPion : public FitFunc
 
   public:
     CoshFuncTwoPion(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 3; FitType = "cosh_two_pion"; }
-
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
 
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
@@ -331,12 +313,9 @@ class TwoPionRatioFunc : public FitFunc
   public:
     TwoPionRatioFunc(double TT, double VV) : FitFunc(), T(TT), V(VV) { Np = 3; FitType = "ratio_two_pion"; }
 
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
-
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
-      // double tp = t + 0.5*(1.0-T);
-      double tp = t - 0.5*T;
+      double tp = 0.5*T - t;
       return p[0] * ( cosh(p[2]*tp) + sinh(p[2]*tp)/tanh(2.0*p[1]*tp) );
     }
 
@@ -344,8 +323,7 @@ class TwoPionRatioFunc : public FitFunc
 
     std::vector<double> eval_derivs(double& t, std::vector<double>& p) const override {
       check_Np(p);
-      // double tp = t + 0.5*(1.0-T);
-      double tp = t - 0.5*T;
+      double tp = 0.5*T - t;
       return { cosh(p[2]*tp) + sinh(p[2]*tp)/tanh(2.0*p[1]*tp),
                -2.0*p[0]*tp*sinh(p[2]*tp)/pow(sinh(2.0*p[1]*tp),2),
                p[0]*tp*cosh((2.0*p[1]+p[2])*tp)/sinh(2.0*p[1]*tp) };
@@ -367,8 +345,6 @@ class ZVFunc : public FitFunc
 
   public:
     ZVFunc(double TT, double VV, double dtt) : FitFunc(), T(TT), V(VV), dt(dtt) { Np = 3; FitType = "zv"; }
-
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
 
     double eval(double& t, std::vector<double>& p) const override {
       check_Np(p);
@@ -402,8 +378,6 @@ class BKFunc : public FitFunc
 
   public:    
     BKFunc(double TT, double VV, double dtt) : FitFunc(), T(TT), V(VV), dt(dtt) { Np = 5; FitType = "bk"; }
-
-    const double& get_mass(std::vector<double>& p) const override { return p[1]; }
 
     double eval(double& t, std::vector<double>& p) const override { 
       check_Np(p);
