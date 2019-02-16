@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 ## 12/28/2016
 ###################################################################
 
+mpl.style.use('classic')
+
 plt.style.use('seaborn-pastel')
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.serif'] = 'Ubuntu'
