@@ -295,7 +295,9 @@ double Fitter::LM_fit(const int& jknife_idx, fit_data& fd, fit_results& fr) cons
   chi = gsl_blas_dnrm2(res_f);
 
   // Summary of fit results
+  #ifdef USE_OMP
   #pragma omp critical
+  #endif
   {
     printf("\n** Summary from method '%s' **\n", gsl_multifit_fdfsolver_name(s));
     printf("Status: %s\n", gsl_strerror(status));
@@ -392,7 +394,9 @@ double Fitter::NM_fit(const int& jknife_idx, fit_data& fd, fit_results& fr) cons
   chisq = s->fval;
 
   // Summary of fit results
+  #ifdef USE_OMP
   #pragma omp critical
+  #endif
   {
     printf("\n** Summary from method '%s' **\n", gsl_multimin_fminimizer_name(s));
     printf("Status: %s\n", gsl_strerror(status));
@@ -433,10 +437,14 @@ fit_results Fitter::do_fit()
 
   // Loop over jackknife samples
   // -1 is the fit to all data (central value)
+  #ifdef USE_OMP
   #pragma omp parallel for
+  #endif
   for(int jknife_idx=-1; jknife_idx<fc.Ntraj; ++jknife_idx)
   {
+    #ifdef USE_OMP
     #pragma omp critical
+    #endif
     {
       if(jknife_idx == -1){ printf("\n----- Fitting to all data -----\n"); }
       else{ printf("\n----- Jackknife sample %d of %d -----\n", jknife_idx+1, fc.Ntraj); }
