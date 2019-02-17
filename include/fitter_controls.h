@@ -25,6 +25,7 @@ typedef struct {
   std::string data_stem;
   std::string eff_mass_stem;
   std::string cov_matrix_stem;
+  size_t Nt;
   double t_min;
   double t_max;
   double t_sep;

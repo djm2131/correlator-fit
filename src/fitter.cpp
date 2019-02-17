@@ -58,6 +58,7 @@ Fitter::Fitter(const std::string& xml_path)
     for(unsigned int i=0; i<fc.fits.size(); ++i){
       corrs[i] = new Correlator(fc, i);
       N_fit_params += corrs[i]->get_Np();
+      fc.fits[i].Nt = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
     }
     fc.Nparams = N_fit_params;
     for(int i=0; i<N_fit_params; ++i){
@@ -142,8 +143,7 @@ int Fitter::f(const gsl_vector* x, void* data, gsl_vector* y) const
     }
 
     // Compute difference between fit and data for each data pt.
-    int Ndat = static_cast<int>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-    for(int j=0; j<Ndat; ++j){
+    for(int j=0; j<fc.fits[i].Nt; ++j){
       gsl_vector_set(y, y_idx, corrs[i]->eval(t[y_idx],p) - C[y_idx]);
       ++y_idx;
     }
@@ -172,8 +172,7 @@ double Fitter::chisq_uncorr(const gsl_vector* x, void* data) const
     }
 
     // Sum chi^2
-    int Ndat = static_cast<int>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-    for(int j=0; j<Ndat; ++j){
+    for(int j=0; j<fc.fits[i].Nt; ++j){
       chi2 += pow( corrs[i]->eval(t[y_idx],p) - C[y_idx], 2.0) * w[y_idx];
       ++y_idx;
     }
@@ -202,17 +201,16 @@ double Fitter::chisq_corr(const gsl_vector* x, void* data) const
     }
 
     // Get differences between data and fit
-    int Ndat = static_cast<int>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-    std::vector<double> dy(Ndat);
-    for(int j=0; j<Ndat; j++){
+    std::vector<double> dy(fc.fits[i].Nt);
+    for(int j=0; j<fc.fits[i].Nt; j++){
       dy[j] = corrs[i]->eval(t[y_idx], p) - C[y_idx];
       ++y_idx;
     }
 
     // Sum chi^2
-    for(int j=0; j<Ndat; ++j){
-    for(int k=0; k<Ndat; ++k){
-      chi2 += dy[j] * mcov[i][j*Ndat+k] * dy[k];
+    for(int j=0; j<fc.fits[i].Nt; ++j){
+    for(int k=0; k<fc.fits[i].Nt; ++k){
+      chi2 += dy[j] * mcov[i][j*fc.fits[i].Nt+k] * dy[k];
     }}
   }
 
@@ -245,8 +243,7 @@ int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J) const
       ++p_idx;
     }
 
-    size_t Ndat = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-    for(int j=0; j<Ndat; ++j){
+    for(int j=0; j<fc.fits[i].Nt; ++j){
       df = corrs[i]->eval_derivs(t[y_idx],p);
       for(int k=0; k<fc.Nparams; ++k){
         if((k >= k_offset) && (k < k_offset+Np)){ gsl_matrix_set(J, y_idx, k, df[k-k_offset]); }
@@ -494,8 +491,7 @@ fit_results Fitter::do_fit()
     if(fc.correlated_fits){
       fd.mcov = new double*[fc.fits.size()];
       for(int i=0; i<fc.fits.size(); i++){
-        size_t N = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-        fd.mcov[i] = new double[N*N];
+        fd.mcov[i] = new double[ fc.fits[i].Nt * fc.fits[i].Nt ];
       }
     }
     fd.me = this;
@@ -510,8 +506,7 @@ fit_results Fitter::do_fit()
         // t
         int t_min = static_cast<int>( fc.fits[i].t_min );
         int t_max = static_cast<int>( fc.fits[i].t_max );
-        int t_len = t_max - t_min + 1;
-        for(int j=0; j<t_len; ++j){
+        for(int j=0; j<fc.fits[i].Nt; ++j){
           fd.t[ii] = t_min+j;
           ii += 1;
         }
@@ -520,7 +515,7 @@ fit_results Fitter::do_fit()
         if(fc.fits[i].resample)
         {
           // Get raw data
-          std::vector<std::vector<double>> Cfit(fc.Ntraj, std::vector<double>(t_len,0.0));
+          std::vector<std::vector<double>> Cfit(fc.Ntraj, std::vector<double>(fc.fits[i].Nt, 0.0));
           for(int j=0; j<fc.Ntraj; ++j){
             int l(0);
             for(int k=0; k<corrs[i]->get_corr_ndata(); ++k){
@@ -537,12 +532,12 @@ fit_results Fitter::do_fit()
           // Compute jackknife average and error
           std::vector<double> Cavg_tmp = jack_avg(Cfit);
           std::vector<double> Cstd_tmp = jack_std(Cfit, Cavg_tmp, true);
-          for(int j=0; j<t_len; ++j){
+          for(int j=0; j<fc.fits[i].Nt; ++j){
             fd.C[j + this_corr_start_idx] = Cavg_tmp[j];
             fd.w[j + this_corr_start_idx] = pow(Cstd_tmp[j],-2.0);
           }
 
-          this_corr_start_idx += t_len;
+          this_corr_start_idx += fc.fits[i].Nt;
         } else {
           int j(jknife_idx+1), l(0);
           for(int k=0; k<corrs[i]->get_corr_ndata(); ++k){
@@ -552,16 +547,15 @@ fit_results Fitter::do_fit()
               ++l;
             }
           }
-          this_corr_start_idx += t_len;
+          this_corr_start_idx += fc.fits[i].Nt;
         }
 
         if(fc.correlated_fits){
           for(int i=0; i<fc.fits.size(); i++)
           {
-            size_t N = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-            for(int j=0; j<N; j++){
-            for(int k=0; k<N; k++){
-              fd.mcov[i][N*j+k] = corrs[i]->get_mcov(j,k);
+            for(int j=0; j<fc.fits[i].Nt; j++){
+            for(int k=0; k<fc.fits[i].Nt; k++){
+              fd.mcov[i][fc.fits[i].Nt*j+k] = corrs[i]->get_mcov(j,k);
             }}
           }
         }
