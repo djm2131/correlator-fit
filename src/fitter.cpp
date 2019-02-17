@@ -58,6 +58,7 @@ Fitter::Fitter(const std::string& xml_path)
     for(unsigned int i=0; i<fc.fits.size(); ++i){
       corrs[i] = new Correlator(fc, i);
       N_fit_params += corrs[i]->get_Np();
+      fc.fits[i].Nt = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
     }
     fc.Nparams = N_fit_params;
     for(int i=0; i<N_fit_params; ++i){
@@ -142,8 +143,7 @@ int Fitter::f(const gsl_vector* x, void* data, gsl_vector* y) const
     }
 
     // Compute difference between fit and data for each data pt.
-    int Ndat = static_cast<int>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-    for(int j=0; j<Ndat; ++j){
+    for(int j=0; j<fc.fits[i].Nt; ++j){
       gsl_vector_set(y, y_idx, corrs[i]->eval(t[y_idx],p) - C[y_idx]);
       ++y_idx;
     }
@@ -152,7 +152,7 @@ int Fitter::f(const gsl_vector* x, void* data, gsl_vector* y) const
   return GSL_SUCCESS;
 }
 
-double Fitter::chisq(const gsl_vector* x, void* data) const
+double Fitter::chisq_uncorr(const gsl_vector* x, void* data) const
 {
   double* t = static_cast<fit_data*>(data) -> t;
   double* C = static_cast<fit_data*>(data) -> C;
@@ -172,11 +172,46 @@ double Fitter::chisq(const gsl_vector* x, void* data) const
     }
 
     // Sum chi^2
-    int Ndat = static_cast<int>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-    for(int j=0; j<Ndat; ++j){
+    for(int j=0; j<fc.fits[i].Nt; ++j){
       chi2 += pow( corrs[i]->eval(t[y_idx],p) - C[y_idx], 2.0) * w[y_idx];
       ++y_idx;
     }
+  }
+
+  return chi2;
+}
+
+double Fitter::chisq_corr(const gsl_vector* x, void* data) const
+{
+  double* t     = static_cast<fit_data*>(data) -> t;
+  double* C     = static_cast<fit_data*>(data) -> C;
+  double** mcov = static_cast<fit_data*>(data) -> mcov;
+
+  int p_idx(0), y_idx(0);
+  double chi2(0.0);
+  for(unsigned int i=0; i<corrs.size(); ++i)
+  {
+    // Get the current parameter values for this correlator
+    size_t Np = corrs[i]->get_Np();
+    std::vector<double> p(Np);
+    for(int j=0; j<Np; ++j){
+      p[j] = gsl_vector_get(x, p_idx);
+      if(fc.constrained_fit){ apply_constraints(x, p, i); }
+      ++p_idx;
+    }
+
+    // Get differences between data and fit
+    std::vector<double> dy(fc.fits[i].Nt);
+    for(int j=0; j<fc.fits[i].Nt; j++){
+      dy[j] = corrs[i]->eval(t[y_idx], p) - C[y_idx];
+      ++y_idx;
+    }
+
+    // Sum chi^2
+    for(int j=0; j<fc.fits[i].Nt; ++j){
+    for(int k=0; k<fc.fits[i].Nt; ++k){
+      chi2 += dy[j] * mcov[i][j*fc.fits[i].Nt+k] * dy[k];
+    }}
   }
 
   return chi2;
@@ -195,7 +230,7 @@ double Fitter::chisq_wrapper(const gsl_vector* x, void* data) {
 
 int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J) const
 {
-  double *t = ((fit_data*)data)->t;
+  double *t = static_cast<fit_data*>(data) -> t;
 
   int p_idx(0), y_idx(0), k_offset(0);
   for(unsigned int i=0; i<corrs.size(); ++i)
@@ -208,8 +243,7 @@ int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J) const
       ++p_idx;
     }
 
-    size_t Ndat = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
-    for(int j=0; j<Ndat; ++j){
+    for(int j=0; j<fc.fits[i].Nt; ++j){
       df = corrs[i]->eval_derivs(t[y_idx],p);
       for(int k=0; k<fc.Nparams; ++k){
         if((k >= k_offset) && (k < k_offset+Np)){ gsl_matrix_set(J, y_idx, k, df[k-k_offset]); }
@@ -274,7 +308,7 @@ double Fitter::LM_fit(const int& jknife_idx, fit_data& fd, fit_results& fr) cons
   }
 
   f.f = &Fitter::f_wrapper;
-  (fc.numerical_derivs) ? (f.df = NULL) : (f.df = &Fitter::df_wrapper);
+  (fc.numerical_derivs) ? (f.df = nullptr) : (f.df = &Fitter::df_wrapper);
   f.n = fc.Ndata;
   f.p = fc.Nparams;
   f.params = &fd;
@@ -431,9 +465,9 @@ double Fitter::NM_fit(const int& jknife_idx, fit_data& fd, fit_results& fr) cons
 
 fit_results Fitter::do_fit()
 {
-  std::vector<double> chi2pdof_jacks(fc.Ntraj);
-  fit_results fr = { 0.0, 0.0, std::vector<double>(fc.Nparams), std::vector<double>(fc.Nparams),
-                     std::vector<std::vector<double>>(fc.Ntraj,std::vector<double>(fc.Nparams)) };
+  fit_results fr = { 0.0, 0.0, std::vector<double>(fc.Nparams),
+      std::vector<double>(fc.Nparams), std::vector<double>(fc.Ntraj),
+      std::vector<std::vector<double>>(fc.Ntraj,std::vector<double>(fc.Nparams)) };
 
   // Loop over jackknife samples
   // -1 is the fit to all data (central value)
@@ -451,9 +485,15 @@ fit_results Fitter::do_fit()
     }
 
     fit_data fd;
-    fd.t = new double[fc.Ndata];
-    fd.C = new double[fc.Ndata];
-    fd.w = new double[fc.Ndata];
+    fd.t    = new double[fc.Ndata];
+    fd.C    = new double[fc.Ndata];
+    fd.w    = new double[fc.Ndata];
+    if(fc.correlated_fits){
+      fd.mcov = new double*[fc.fits.size()];
+      for(int i=0; i<fc.fits.size(); i++){
+        fd.mcov[i] = new double[ fc.fits[i].Nt * fc.fits[i].Nt ];
+      }
+    }
     fd.me = this;
     {
       int ii(0);
@@ -466,8 +506,7 @@ fit_results Fitter::do_fit()
         // t
         int t_min = static_cast<int>( fc.fits[i].t_min );
         int t_max = static_cast<int>( fc.fits[i].t_max );
-        int t_len = t_max - t_min + 1;
-        for(int j=0; j<t_len; ++j){
+        for(int j=0; j<fc.fits[i].Nt; ++j){
           fd.t[ii] = t_min+j;
           ii += 1;
         }
@@ -476,7 +515,7 @@ fit_results Fitter::do_fit()
         if(fc.fits[i].resample)
         {
           // Get raw data
-          std::vector<std::vector<double>> Cfit(fc.Ntraj, std::vector<double>(t_len,0.0));
+          std::vector<std::vector<double>> Cfit(fc.Ntraj, std::vector<double>(fc.fits[i].Nt, 0.0));
           for(int j=0; j<fc.Ntraj; ++j){
             int l(0);
             for(int k=0; k<corrs[i]->get_corr_ndata(); ++k){
@@ -493,12 +532,12 @@ fit_results Fitter::do_fit()
           // Compute jackknife average and error
           std::vector<double> Cavg_tmp = jack_avg(Cfit);
           std::vector<double> Cstd_tmp = jack_std(Cfit, Cavg_tmp, true);
-          for(int j=0; j<t_len; ++j){
+          for(int j=0; j<fc.fits[i].Nt; ++j){
             fd.C[j + this_corr_start_idx] = Cavg_tmp[j];
             fd.w[j + this_corr_start_idx] = pow(Cstd_tmp[j],-2.0);
           }
 
-          this_corr_start_idx += t_len;
+          this_corr_start_idx += fc.fits[i].Nt;
         } else {
           int j(jknife_idx+1), l(0);
           for(int k=0; k<corrs[i]->get_corr_ndata(); ++k){
@@ -508,7 +547,17 @@ fit_results Fitter::do_fit()
               ++l;
             }
           }
-          this_corr_start_idx += t_len;
+          this_corr_start_idx += fc.fits[i].Nt;
+        }
+
+        if(fc.correlated_fits){
+          for(int i=0; i<fc.fits.size(); i++)
+          {
+            for(int j=0; j<fc.fits[i].Nt; j++){
+            for(int k=0; k<fc.fits[i].Nt; k++){
+              fd.mcov[i][fc.fits[i].Nt*j+k] = corrs[i]->get_mcov(j,k);
+            }}
+          }
         }
       }
     }
@@ -517,15 +566,19 @@ fit_results Fitter::do_fit()
     if(fc.algorithm == "LM"){ chi2pdof = LM_fit(jknife_idx, fd, fr); }
     else if(fc.algorithm == "NM"){ chi2pdof = NM_fit(jknife_idx, fd, fr); }
     else{ printf("Error: unrecognized algorithm %s\n", fc.algorithm.c_str()); exit(-1); }
-    (jknife_idx == -1) ? (fr.chi2pdof = chi2pdof) : (chi2pdof_jacks[jknife_idx] = chi2pdof);
+    (jknife_idx == -1) ? (fr.chi2pdof = chi2pdof) : (fr.chi2pdof_jacks[jknife_idx] = chi2pdof);
 
     delete[] fd.w;
     delete[] fd.C;
     delete[] fd.t;
+    if(fc.correlated_fits){
+      for(int i=0; i<fc.fits.size(); i++){ delete[] fd.mcov[i]; }
+      delete[] fd.mcov;
+    }
   }
 
   fr.p_err = jack_std(fr.p_jacks, fr.p_cv, false);
-  fr.chi2pdof_err = jack_std(chi2pdof_jacks, fr.chi2pdof, false);
+  fr.chi2pdof_err = jack_std(fr.chi2pdof_jacks, fr.chi2pdof, false);
   printf("\n----- done -----\n");
 
   return fr;
@@ -563,6 +616,27 @@ void Fitter::save_jacks(const fit_results& fr) const
       fclose(fj);
 
     }}
+
+  printf("\n\n");
+}
+
+void Fitter::save_chi2pdof(const fit_results& fr) const
+{
+  printf("----- Saving chi^2/dof -----");
+
+  // central value
+  std::string fout_cv = fc.chi2pdof_stem + ".dat";
+  FILE* fcv = fopen(fout_cv.c_str(), "w");
+  fprintf(fcv, "%1.8e\n", fr.chi2pdof);
+  fclose(fcv);
+
+  // jackknife samples
+  std::string fout_jacks = fc.chi2pdof_stem + "_jacks.dat";
+  FILE* fj = fopen(fout_jacks.c_str(), "w");
+  for(int j=0; j<fc.Ntraj; ++j){
+    fprintf(fj, "%1.8e\n", fr.chi2pdof_jacks[j]);
+  }
+  fclose(fj);
 
   printf("\n\n");
 }

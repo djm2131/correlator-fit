@@ -24,6 +24,8 @@ typedef struct {
   std::string eff_mass_type;
   std::string data_stem;
   std::string eff_mass_stem;
+  std::string cov_matrix_stem;
+  size_t Nt;
   double t_min;
   double t_max;
   double t_sep;
@@ -38,6 +40,8 @@ typedef struct {
   double xtol;
   double gtol;
   double ftol;
+  bool correlated_fits;
+  double svd_cut;
 
   // Lattice volume
   int L;
@@ -66,7 +70,9 @@ typedef struct {
 
   // Output options
   bool save_jacks;
+  bool save_chi2pdof;
   std::string jacks_dir;
+  std::string chi2pdof_stem;
 } fitter_controls;
 
 #endif 
