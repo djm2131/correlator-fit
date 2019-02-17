@@ -24,6 +24,7 @@ typedef struct {
   std::string eff_mass_type;
   std::string data_stem;
   std::string eff_mass_stem;
+  std::string cov_matrix_stem;
   double t_min;
   double t_max;
   double t_sep;

@@ -16,9 +16,10 @@
 #include <vector>
 #include <string>
 
+#include "eff_mass.h"
 #include "fit_functions.h"
 #include "fitter_controls.h"
-#include "eff_mass.h"
+#include "gsl_pinv.h"
 
 // Parse a line of floating point numbers
 // delimited by token into a vector of doubles
@@ -31,6 +32,7 @@ class Correlator
     std::vector<std::vector<double>> t;
     std::vector<std::vector<double>> C;
     std::vector<std::vector<double>> w;
+    std::vector<std::vector<double>> mcov;
     FitFunc *f;
     EffMassFunc *ef;
 
@@ -44,9 +46,10 @@ class Correlator
     size_t get_Np() const { return f->get_Np(); }
     size_t get_stencil_size() const { return ef->get_stencil_size(); }
 
-    const double& get_time_slice(int i, int j) const { return t[i][j]; }
-    const double& get_data_pt(int i, int j) const { return C[i][j]; }
-    const double& get_weights(int i, int j) const { return w[i][j]; }
+    const double& get_time_slice(const int& i, const int& j) const { return t[i][j]; }
+    const double& get_data_pt(const int& i, const int& j) const { return C[i][j]; }
+    const double& get_weights(const int& i, const int& j) const { return w[i][j]; }
+    const double& get_mcov(const int& i, const int& j) const { return mcov[i][j]; }
 
     double eval(double& t, std::vector<double>& p) const { return f->eval(t,p); }
     double thermal_state(double& t, std::vector<double>& p) const { return f->thermal_state(t,p); }

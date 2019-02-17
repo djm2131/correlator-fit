@@ -152,7 +152,7 @@ int Fitter::f(const gsl_vector* x, void* data, gsl_vector* y) const
   return GSL_SUCCESS;
 }
 
-double Fitter::chisq(const gsl_vector* x, void* data) const
+double Fitter::chisq_uncorr(const gsl_vector* x, void* data) const
 {
   double* t = static_cast<fit_data*>(data) -> t;
   double* C = static_cast<fit_data*>(data) -> C;
@@ -182,6 +182,43 @@ double Fitter::chisq(const gsl_vector* x, void* data) const
   return chi2;
 }
 
+double Fitter::chisq_corr(const gsl_vector* x, void* data) const
+{
+  double* t     = static_cast<fit_data*>(data) -> t;
+  double* C     = static_cast<fit_data*>(data) -> C;
+  double** mcov = static_cast<fit_data*>(data) -> mcov;
+
+  int p_idx(0), y_idx(0);
+  double chi2(0.0);
+  for(unsigned int i=0; i<corrs.size(); ++i)
+  {
+    // Get the current parameter values for this correlator
+    size_t Np = corrs[i]->get_Np();
+    std::vector<double> p(Np);
+    for(int j=0; j<Np; ++j){
+      p[j] = gsl_vector_get(x, p_idx);
+      if(fc.constrained_fit){ apply_constraints(x, p, i); }
+      ++p_idx;
+    }
+
+    // Get differences between data and fit
+    int Ndat = static_cast<int>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
+    std::vector<double> dy(Ndat);
+    for(int j=0; j<Ndat; j++){
+      dy[j] = corrs[i]->eval(t[y_idx], p) - C[y_idx];
+      ++y_idx;
+    }
+
+    // Sum chi^2
+    for(int j=0; j<Ndat; ++j){
+    for(int k=0; k<Ndat; ++k){
+      chi2 += dy[j] * mcov[i][j*Ndat+k] * dy[k];
+    }}
+  }
+
+  return chi2;
+}
+
 // Neat trick: we can construct a C function pointer to a member
 // function of a C++ class by declaring a static wrapper which
 // gets passed a 'this' pointer through the fit_data struct
@@ -195,7 +232,7 @@ double Fitter::chisq_wrapper(const gsl_vector* x, void* data) {
 
 int Fitter::df(const gsl_vector* x, void* data, gsl_matrix* J) const
 {
-  double *t = ((fit_data*)data)->t;
+  double *t = static_cast<fit_data*>(data) -> t;
 
   int p_idx(0), y_idx(0), k_offset(0);
   for(unsigned int i=0; i<corrs.size(); ++i)
@@ -274,7 +311,7 @@ double Fitter::LM_fit(const int& jknife_idx, fit_data& fd, fit_results& fr) cons
   }
 
   f.f = &Fitter::f_wrapper;
-  (fc.numerical_derivs) ? (f.df = NULL) : (f.df = &Fitter::df_wrapper);
+  (fc.numerical_derivs) ? (f.df = nullptr) : (f.df = &Fitter::df_wrapper);
   f.n = fc.Ndata;
   f.p = fc.Nparams;
   f.params = &fd;
@@ -451,9 +488,16 @@ fit_results Fitter::do_fit()
     }
 
     fit_data fd;
-    fd.t = new double[fc.Ndata];
-    fd.C = new double[fc.Ndata];
-    fd.w = new double[fc.Ndata];
+    fd.t    = new double[fc.Ndata];
+    fd.C    = new double[fc.Ndata];
+    fd.w    = new double[fc.Ndata];
+    if(fc.correlated_fits){
+      fd.mcov = new double*[fc.fits.size()];
+      for(int i=0; i<fc.fits.size(); i++){
+        size_t N = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
+        fd.mcov[i] = new double[N*N];
+      }
+    }
     fd.me = this;
     {
       int ii(0);
@@ -510,6 +554,17 @@ fit_results Fitter::do_fit()
           }
           this_corr_start_idx += t_len;
         }
+
+        if(fc.correlated_fits){
+          for(int i=0; i<fc.fits.size(); i++)
+          {
+            size_t N = static_cast<size_t>( fc.fits[i].t_max - fc.fits[i].t_min + 1 );
+            for(int j=0; j<N; j++){
+            for(int k=0; k<N; k++){
+              fd.mcov[i][N*j+k] = corrs[i]->get_mcov(j,k);
+            }}
+          }
+        }
       }
     }
 
@@ -522,6 +577,10 @@ fit_results Fitter::do_fit()
     delete[] fd.w;
     delete[] fd.C;
     delete[] fd.t;
+    if(fc.correlated_fits){
+      for(int i=0; i<fc.fits.size(); i++){ delete[] fd.mcov[i]; }
+      delete[] fd.mcov;
+    }
   }
 
   fr.p_err = jack_std(fr.p_jacks, fr.p_cv, false);

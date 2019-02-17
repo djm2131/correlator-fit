@@ -27,10 +27,10 @@ std::vector<double> tokenize_line(const std::string& s, const std::string& delim
   std::vector<double> tokens;
 
   while(getline(iss,token,' ')){ if(!token.empty()){ tokens.push_back( strtod(token.c_str(), nullptr) ); } }
-  if(tokens.size() != 3){
-    printf("Error: expected data format is Nx3 matrix with format: (t, real(C(t)), imag(C(t))).\n");
-    exit(-1);
-  }
+  // if(tokens.size() != 3){
+  //   printf("Error: expected data format is Nx3 matrix with format: (t, real(C(t)), imag(C(t))).\n");
+  //   exit(-1);
+  // }
 
   return tokens;
 }
@@ -130,10 +130,45 @@ Correlator::Correlator(fitter_controls& fc, const int& this_fit)
     include_in_fit.insert(include_in_fit.begin(), include_tmp);
   }
 
+  // Get the covariance matrix if we're doing correlated fits
+  if(fc.correlated_fits)
+  {
+    size_t N = static_cast<size_t >( fc.fits[this_fit].t_max - fc.fits[this_fit].t_min + 1 );
+    mcov.resize(N, std::vector<double>(N));
+
+    std::stringstream ss;
+    ss << fc.fits[this_fit].cov_matrix_stem;
+    std::ifstream in(ss.str());
+    if(!in.is_open()){
+      printf("Error: failed to open file %s\n", ss.str().c_str());
+      exit(-1);
+    }
+
+    int t1(0), row(0);
+    std::string line;
+    std::vector<double> tokens;
+    while(getline(in,line))
+    {
+      if((t1 < fc.fits[this_fit].t_min) || (t1 > fc.fits[this_fit].t_max)){ t1++; continue; }
+      tokens = tokenize_line(line, " ");
+      int col(0);
+      for(int t2=0; t2<tokens.size(); t2++){
+        if((t2 >= fc.fits[this_fit].t_min) && (t2 <= fc.fits[this_fit].t_max)){
+          mcov[row][col] = tokens[t2];
+          col++;
+        }
+      }
+      row++;
+      t1++;
+    }
+
+    gsl_pinv(mcov, fc.svd_cut);
+  }
+
   // Construct the appropriate FitFunc object for this fit form
   // The available forms are defined in include/fit_functions.h
   // double V = static_cast<double>( pow(fc.L,3)*fc.T );
-  double V = static_cast<double>( pow(fc.L,3) );
+  double V = pow(fc.L, 3);
   if     (fc.fits[this_fit].fit_type == "constant"      ){ f = new ConstFunc();                              }
   else if(fc.fits[this_fit].fit_type == "linear"        ){ f = new LinearFunc();                             }
   else if(fc.fits[this_fit].fit_type == "exp"           ){ f = new ExpFunc(V);                               }
