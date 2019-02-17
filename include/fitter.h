@@ -61,6 +61,7 @@ class Fitter {
     fit_results do_fit();
     void print_results(const fit_results& fr) const;
     void save_jacks(const fit_results& fr) const;
+    void save_chi2pdof(const fit_results& fr) const;
     void compute_eff_mass(fit_results& fr) const;
     void save_eff_mass(const fit_results& fr) const;
     ~Fitter();

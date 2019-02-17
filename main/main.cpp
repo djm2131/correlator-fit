@@ -29,6 +29,9 @@ int main(int argc, char **argv)
   // Save fit parameters (for global fits)
   fit.save_jacks(fr);
 
+  // Save chi^2/dof
+  fit.save_chi2pdof(fr);
+
   // Compute and save effective masses
   fit.compute_eff_mass(fr);
   fit.save_eff_mass(fr);

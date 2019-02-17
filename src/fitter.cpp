@@ -468,9 +468,9 @@ double Fitter::NM_fit(const int& jknife_idx, fit_data& fd, fit_results& fr) cons
 
 fit_results Fitter::do_fit()
 {
-  std::vector<double> chi2pdof_jacks(fc.Ntraj);
-  fit_results fr = { 0.0, 0.0, std::vector<double>(fc.Nparams), std::vector<double>(fc.Nparams),
-                     std::vector<std::vector<double>>(fc.Ntraj,std::vector<double>(fc.Nparams)) };
+  fit_results fr = { 0.0, 0.0, std::vector<double>(fc.Nparams),
+      std::vector<double>(fc.Nparams), std::vector<double>(fc.Ntraj),
+      std::vector<std::vector<double>>(fc.Ntraj,std::vector<double>(fc.Nparams)) };
 
   // Loop over jackknife samples
   // -1 is the fit to all data (central value)
@@ -572,7 +572,7 @@ fit_results Fitter::do_fit()
     if(fc.algorithm == "LM"){ chi2pdof = LM_fit(jknife_idx, fd, fr); }
     else if(fc.algorithm == "NM"){ chi2pdof = NM_fit(jknife_idx, fd, fr); }
     else{ printf("Error: unrecognized algorithm %s\n", fc.algorithm.c_str()); exit(-1); }
-    (jknife_idx == -1) ? (fr.chi2pdof = chi2pdof) : (chi2pdof_jacks[jknife_idx] = chi2pdof);
+    (jknife_idx == -1) ? (fr.chi2pdof = chi2pdof) : (fr.chi2pdof_jacks[jknife_idx] = chi2pdof);
 
     delete[] fd.w;
     delete[] fd.C;
@@ -584,7 +584,7 @@ fit_results Fitter::do_fit()
   }
 
   fr.p_err = jack_std(fr.p_jacks, fr.p_cv, false);
-  fr.chi2pdof_err = jack_std(chi2pdof_jacks, fr.chi2pdof, false);
+  fr.chi2pdof_err = jack_std(fr.chi2pdof_jacks, fr.chi2pdof, false);
   printf("\n----- done -----\n");
 
   return fr;
@@ -622,6 +622,27 @@ void Fitter::save_jacks(const fit_results& fr) const
       fclose(fj);
 
     }}
+
+  printf("\n\n");
+}
+
+void Fitter::save_chi2pdof(const fit_results& fr) const
+{
+  printf("----- Saving chi^2/dof -----");
+
+  // central value
+  std::string fout_cv = fc.chi2pdof_stem + ".dat";
+  FILE* fcv = fopen(fout_cv.c_str(), "w");
+  fprintf(fcv, "%1.8e\n", fr.chi2pdof);
+  fclose(fcv);
+
+  // jackknife samples
+  std::string fout_jacks = fc.chi2pdof_stem + "_jacks.dat";
+  FILE* fj = fopen(fout_jacks.c_str(), "w");
+  for(int j=0; j<fc.Ntraj; ++j){
+    fprintf(fj, "%1.8e\n", fr.chi2pdof_jacks[j]);
+  }
+  fclose(fj);
 
   printf("\n\n");
 }

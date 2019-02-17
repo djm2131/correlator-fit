@@ -69,7 +69,9 @@ typedef struct {
 
   // Output options
   bool save_jacks;
+  bool save_chi2pdof;
   std::string jacks_dir;
+  std::string chi2pdof_stem;
 } fitter_controls;
 
 #endif 
