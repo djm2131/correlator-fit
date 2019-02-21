@@ -180,6 +180,11 @@ class XML_parser{
       fit_controls.correlated_fits  = static_cast<bool>( parse_numeric("/fit/fitter/correlated_fits") );
       fit_controls.svd_cut          = parse_numeric("/fit/fitter/svd_cut");
 
+      if((fit_controls.algorithm == "LM") && (fit_controls.correlated_fits == true)){
+        printf("\nError: Levenberg-Marquardt fitter does not currently support correlated fits.\n");
+        exit(-1);
+      }
+
       // Parse the lattice parameters
       fit_controls.L          = static_cast<int>( parse_numeric("/fit/Lattice/L") );
       fit_controls.T          = static_cast<int>( parse_numeric("/fit/Lattice/T") );
