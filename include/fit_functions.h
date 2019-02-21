@@ -129,6 +129,38 @@ class ExpFunc : public FitFunc
     ~ExpFunc() override = default;
 };
 
+// Single exponential plus constant: y[t] = Z^2/(2*m*V) * e^(-m*t) + C
+// p[0] = Z
+// p[1] = m
+// p[2] = C
+class ExpPlusConstFunc : public FitFunc
+{
+  protected:
+    double V;
+
+  public:
+    explicit ExpPlusConstFunc(double VV) : FitFunc(), V(VV) { Np = 3; FitType = "exp_plus_const"; }
+
+    double eval(double& t, std::vector<double>& p) const override {
+      check_Np(p);
+      return pow(p[0],2.0)/(2.0*p[1]*V)*exp(-p[1]*t) + p[2];
+    }
+
+    double thermal_state(double& t, std::vector<double>& p) const override {
+      check_Np(p);
+      return 0.0;
+    }
+
+    std::vector<double> eval_derivs(double& t, std::vector<double>& p) const override {
+      check_Np(p);
+      return { p[0]/p[1]/V*exp(-p[1]*t),
+               -pow(p[0],2.0)/(2.0*pow(p[1],2.0)*V)*(1.0+p[1]*t)*exp(-p[1]*t),
+               1.0 };
+    }
+
+    ~ExpPlusConstFunc() override = default;
+};
+
 // Two-state exponential: y[t] = Z_1^2/(2*m_1*V) * e^(-m_1*t) + sgn(Z_2)*Z_2^2/(2*m_2*V) * e^(-m_2*t)
 // Need to allow for Z_1 and Z_2 to have different relative signs
 //  p[0] = Z_1
